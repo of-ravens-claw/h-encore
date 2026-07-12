@@ -1,4 +1,7 @@
-build
+.vscode/
+build/
+bootstrap/res/*
+payload/bootstrap.h
 *.o
 *.elf
 *.bin

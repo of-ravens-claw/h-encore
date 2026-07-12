@@ -95,18 +95,24 @@ int load_sce_paf() {
 
   int result = -1;
 
-  uint32_t buf[4];
-  buf[0] = sizeof(buf);
-  buf[1] = (uint32_t)&result;
-  buf[2] = -1;
-  buf[3] = -1;
+  SceSysmoduleOpt option;
+  option.flags     = 0x10;
+  option.result    = &result;
+  option.unused[0] = -1;
+  option.unused[1] = -1;
 
-  return sceSysmoduleLoadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF, sizeof(argp), argp, buf);
+  return sceSysmoduleLoadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF, sizeof(argp), argp, &option);
 }
 
 int unload_sce_paf() {
-  uint32_t buf = 0;
-  return sceSysmoduleUnloadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF, 0, NULL, &buf);
+  int result = -1;
+
+  SceSysmoduleOpt option;
+  option.flags     = 0x10;
+  option.result    = &result;
+  option.unused[0] = -1;
+  option.unused[1] = -1;
+  return sceSysmoduleUnloadModuleInternalWithArg(SCE_SYSMODULE_INTERNAL_PAF, 0, NULL, &option);
 }
 
 int promote_app(const char *path) {

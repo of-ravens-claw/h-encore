@@ -169,14 +169,22 @@ int strcmp(const char *s1, const char *s2) {
 	return (*(unsigned char *)s1 - *(unsigned char *)--s2);
 }
 
-static inline int memcpy(void *dst, const void *src, int len) {
+void *memcpy(void *dst, const void *src, unsigned int len) {
 	char *dst1 = (char *)dst;
 	const char *src1 = (const char *)src;
 	while (len > 0) {
 		*dst1++ = *src1++;
 		len--;
 	}
-	return 0;
+	return dst;
+}
+
+void *memset(void *dest, int val, unsigned int len) {
+    char *ptr = (char *)dest;
+    while (len-- > 0) {
+        *ptr++ = val;
+    }
+    return dest;
 }
 
 module_info_t * find_modinfo(uint32_t start_addr, const char *needle) {
