@@ -319,9 +319,9 @@ unsigned hook_sbl_F3411881(unsigned a1, unsigned a2, unsigned a3, unsigned a4) {
 		DACR_OFF(
 			g_homebrew_decrypt = 1;
 		);
-	// BEGIN 3.65-3.68
+	// BEGIN 3.60-3.74
 		somebuf[42] = 0x40;
-	// END 3.65-3.68
+	// END 3.60-3.74
 
 		return 0;
 	} else {
@@ -624,15 +624,38 @@ int mount_savedata(int pid) {
 		const char *desired_mount_point, const void *klicensee, char *mount_point);
 
 	switch (appmgr_info->module_nid) {
-		case 0x1C9879D6: // 3.65 retail
+		case 0x94CEFE4B: // 3.55
+		case 0xDFBC288C: // 3.57
+			sceAppMgrFindProcessInfoByPid = (void *)(appmgr_code + 0x2DE1);
+			sceAppMgrMountById = (void *)(appmgr_code + 0x19E15);
+			break;
+
+		case 0xDBB29DB7: // 3.60
+		case 0xB5F8EA7C: // 3.61
+			sceAppMgrFindProcessInfoByPid = (void *)(appmgr_code + 0x2DE1);
+			sceAppMgrMountById = (void *)(appmgr_code + 0x19B51);
+			break;
+
+		case 0x23B967C5: // 3.63
+		case 0x1C9879D6: // 3.65
 			sceAppMgrFindProcessInfoByPid = (void *)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void *)(appmgr_code + 0x19E61);
 			break;
 
-		case 0x54E2E984: // 3.67 retail
-		case 0xC3C538DE: // 3.68 retail
+		case 0x54E2E984: // 3.67
+		case 0xC3C538DE: // 3.68
 			sceAppMgrFindProcessInfoByPid = (void *)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void *)(appmgr_code + 0x19E6D);
+			break;
+
+		case 0x321E4852: // 3.69
+		case 0x700DA0CD: // 3.70
+		case 0xF7846B4E: // 3.71
+		case 0xA8E80BA8: // 3.72
+		case 0xB299D195: // 3.73
+		case 0x30007BD3: // 3.74
+			sceAppMgrFindProcessInfoByPid = (void *)(appmgr_code + 0x2DE9);
+			sceAppMgrMountById = (void *)(appmgr_code + 0x19E95);
 			break;
 
 		default:
@@ -836,7 +859,7 @@ void resolve_imports(unsigned sysmem_base) {
 		ksceCtrlPeekBufferPositive = find_export(ctrl_info, 0xEA1D3A34);
 	);
 
-	// BEGIN 3.65-3.68
+	// BEGIN 3.63-3.74
 	int *syscall_lo = (int *)(modulemgr_data + 0x2038c);
 	DACR_OFF(
 		syscall_table = (void **) (*((u32_t*)(modulemgr_data + 0x20388)));
@@ -844,7 +867,7 @@ void resolve_imports(unsigned sysmem_base) {
 		syscall_stub = (void *)(modulemgr_base + 0x9fc5);
 	);
 	*syscall_lo = syscall_id + 5;
-	// END 3.65-3.68
+	// END 3.63-3.74
 }
 
 void fix_ngs() {
@@ -906,9 +929,9 @@ void __attribute__ ((section (".text.start"))) payload(void *rx_block, uint32_t 
 	// find sysmem base, etc
 	uint32_t sysmem_base = sysmem_addr;
 	int ret;
-	// BEGIN 3.65-3.68
+	// BEGIN 3.55-3.74
 	void (*debug_print_local)(char *s, ...) = (void*)(sysmem_base + 0x1A155);
-	// END 3.65-3.68
+	// END 3.55-3.74
 
 	DACR_OFF(
 		debug_print = debug_print_local;

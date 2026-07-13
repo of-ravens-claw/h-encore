@@ -16,8 +16,6 @@ menu:
 
 clean:
 	-rm system.dat
-	-rm -rf taiHEN/build
-	-rm -rf plugin/build
 	-rm -rf bootstrap/build
 	-rm payload/bootstrap.h
 	-rm stage2/payload.bin.gz
