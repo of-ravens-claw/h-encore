@@ -472,7 +472,7 @@ int print_menu(int sel) {
   return 0;
 }
 
-void _start() __attribute__ ((weak, alias ("module_start")));
+int _start() __attribute__ ((weak, alias ("module_start")));
 int module_start(SceSize args, void *argp) {
   SceAppUtilInitParam init_param;
   SceAppUtilBootParam boot_param;
@@ -481,6 +481,7 @@ int module_start(SceSize args, void *argp) {
   int sel;
   int res;
 
+  res = -1;
   syscall_id = *(uint16_t *)argp;
 
   sceAppMgrDestroyOtherApp();

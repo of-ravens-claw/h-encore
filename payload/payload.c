@@ -2,74 +2,82 @@
 
 #include "bootstrap.h"
 
-// ALL 3.65-3.68 SPECIFIC SECTIONS ARE MARKED WITH "// BEGIN 3.65-3.68"
-
-#if DEBUG
+#ifdef DEBUG
 #define LOG(fmt, ...) debug_print("[%s:%d] " fmt "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
 #else
 #define LOG(fmt, ...)
 #endif
 
-#define NULL ((void *)0)
+#define NULL ((void*)0)
 
-#define DACR_OFF(stmt)                 \
-do {                                   \
-	unsigned prev_dacr;                \
-	__asm__ volatile(                  \
-		"mrc p15, 0, %0, c3, c0, 0 \n" \
-		: "=r" (prev_dacr)             \
-	);                                 \
-	__asm__ volatile(                  \
-		"mcr p15, 0, %0, c3, c0, 0 \n" \
-		: : "r" (0xFFFF0000)           \
-	);                                 \
-	stmt;                              \
-	__asm__ volatile(                  \
-		"mcr p15, 0, %0, c3, c0, 0 \n" \
-		: : "r" (prev_dacr)            \
-	);                                 \
+#define DACR_OFF(stmt)                                                         \
+do {                                                                           \
+	uint32_t prev_dacr;                                                    \
+	__asm__ volatile("mrc p15, 0, %0, c3, c0, 0 \n" : "=r" (prev_dacr));   \
+	__asm__ volatile("mcr p15, 0, %0, c3, c0, 0 \n" : : "r" (0xFFFF0000)); \
+	stmt;                                                                  \
+	__asm__ volatile("mcr p15, 0, %0, c3, c0, 0 \n" : : "r" (prev_dacr));  \
 } while (0)
 
-#define INSTALL_HOOK(func, addr) \
-do {                                               \
-	unsigned *target;                              \
-	target = (unsigned*)(addr);                    \
-	*target++ = 0xE59FF000; /* ldr pc, [pc, #0] */ \
-	*target++; /* doesn't matter */                \
-	*target = (unsigned)func;                      \
+// Encodes the following instruction sequence, in ARM mode:
+// - LDR PC, [PC, #0]
+// - NOP              @ This instruction will never be executed.
+// - DCD addr         @ 32-bit address to jump to.
+// Corrupts 12 bytes.
+#define INSTALL_HOOK(func, addr)              \
+do {                                          \
+	uint32_t* target = (uint32_t*)(addr); \
+	target[0] = 0xE59FF000;               \
+	target[1] = 0xE320F000;               \
+	target[2] = (uint32_t)(func);         \
 } while (0)
 
-#define INSTALL_HOOK_THUMB(func, addr) \
-do {                                                \
-	unsigned *target;                                 \
-	target = (unsigned*)(addr);                       \
-	*target++ = 0xC004F8DF; /* ldr.w	ip, [pc, #4] */ \
-	*target++ = 0xBF004760; /* bx ip; nop */          \
-	*target = (unsigned)func;                         \
+// Encodes the following instruction sequence, in Thumb mode.
+// - LDR.W IP, [PC, #4]
+// - BX    IP
+// - NOP                @ This instruction will never be executed.
+// - DCD addr           @ 32-bit address to jump to.
+// Corrupts 12 bytes.
+#define INSTALL_HOOK_THUMB(func, addr)        \
+do {                                          \
+	uint32_t* target = (uint32_t*)(addr); \
+	target[0] = 0xC004F8DF;               \
+	target[1] = 0xBF004760;               \
+	target[2] = (uint32_t)(func);         \
 } while (0)
 
-#define INSTALL_RET(addr, ret) \
-do {                                            \
-	unsigned *target;                             \
-	target = (unsigned*)(addr);                   \
-	*target++ = 0xe3a00000 | ret; /* mov r0, #ret */ \
-	*target = 0xe12fff1e; /* bx lr */             \
+// Encodes the following instruction sequence, in ARM mode:
+// - MOV R0, #ret
+// - BX  LR
+// Corrupts 8 bytes.
+// `ret` must be encoded according to ARM's immediate encoding scheme.
+#define INSTALL_RET(addr, ret)                \
+do {                                          \
+	uint32_t* target = (uint32_t*)(addr); \
+	target[0] = 0xE3A00000 | (ret);       \
+	target[1] = 0xE12FFF1E;               \
 } while (0)
 
-#define INSTALL_RET_THUMB(addr, ret) \
-do {                                            \
-	unsigned *target;                             \
-	target = (unsigned*)(addr);                   \
-	*target = 0x47702000 | ret; /* movs r0, #ret; bx lr */ \
+// Encodes the following instruction sequence, in Thumb mode:
+// - MOVS R0, #ret
+// - BX   LR
+// Corrupts 4 bytes.
+// `ret` must be an 8-bit immediate.
+#define INSTALL_RET_THUMB(addr, ret)          \
+do {                                          \
+	uint32_t* target = (uint32_t*)(addr); \
+	target[0] = 0x47702000 | (ret);       \
 } while (0)
 
-#define ENTER_SYSCALL(state) do { \
-  __asm__ volatile ("mrc p15, 0, %0, c13, c0, 3" : "=r" (state)); \
-  __asm__ volatile ("mcr p15, 0, %0, c13, c0, 3" :: "r" (state << 16) : "memory"); \
-} while(0)
+#define ENTER_SYSCALL(state)                                                             \
+do {                                                                                     \
+	__asm__ volatile ("mrc p15, 0, %0, c13, c0, 3" : "=r" (state));                  \
+	__asm__ volatile ("mcr p15, 0, %0, c13, c0, 3" :: "r" (state << 16) : "memory"); \
+} while (0)
 
-#define EXIT_SYSCALL(state) do { \
-  __asm__ volatile ("mcr p15, 0, %0, c13, c0, 3" :: "r" (state) : "memory"); \
+#define EXIT_SYSCALL(state)                                                        \
+do {                                                                               \
+	__asm__ volatile ("mcr p15, 0, %0, c13, c0, 3" :: "r" (state) : "memory"); \
 } while (0)
 
 typedef uint64_t u64_t;
@@ -79,78 +87,78 @@ typedef uint8_t u8_t;
 
 typedef struct segment_info
 {
-	int           size;   // this structure size (0x18)
-	int           perms;  // probably rwx in low bits
-	void            *vaddr; // address in memory
-	int           memsz;  // size in memory
-	int           flags;  // meanig unknown
-	int           res;    // unused?
+	int  size;   // this structure size (0x18)
+	int  perms;  // probably rwx in low bits
+	void *vaddr; // address in memory
+	int  memsz;  // size in memory
+	int  flags;  // meanig unknown
+	int  res;    // unused?
 } segment_info_t;
 
-typedef struct SceModInfo {
-	int size;           //0
-	int UID;            //4
-	int mod_attr;       //8
-	char name[0x1C];        //0xC
-	u32_t unk0;         //0x28
-	void *module_start;     //0x2C addr0
-	void *module_init;      //0x30 addr1
-	void *module_stop;      //0x34 addr2
-	void *exidx_start;      //0x38 addr3
-	void *exidx_end;        //0x3C addr4
-	void *addr5;        //0x40 addr5
-	void *addr6;        //0x44 addr6
-	void *module_top;       //0x48 addr7
-	void *addr8;        //0x4C addr8
-	void *addr9;        //0x50 addr9
-	char filepath[0x100];   //0x54
-	segment_info_t  segments[4]; //0x58
-	u32_t unk2;         //0x1B4
-} SceModInfo; //0x1B8
+typedef struct SceModInfo
+{
+	int            size;            // 0x00
+	int            UID;             // 0x04
+	int            mod_attr;        // 0x08
+	char           name[0x1C];      // 0x0C
+	u32_t          unk0;            // 0x28
+	void           *module_start;   // 0x2C addr0
+	void           *module_init;    // 0x30 addr1
+	void           *module_stop;    // 0x34 addr2
+	void           *exidx_start;    // 0x38 addr3
+	void           *exidx_end;      // 0x3C addr4
+	void           *addr5;          // 0x40 addr5
+	void           *addr6;          // 0x44 addr6
+	void           *module_top;     // 0x48 addr7
+	void           *addr8;          // 0x4C addr8
+	void           *addr9;          // 0x50 addr9
+	char           filepath[0x100]; // 0x54
+	segment_info_t segments[4];     // 0x58
+	u32_t          unk2;            // 0x1B4
+} SceModInfo; // 0x1B8
 
 #define MOD_LIST_SIZE 0x80
-
 typedef struct module_imports_2
 {
-  u16_t size; // 0x24
-  u16_t version;
-  u16_t flags;
-  u16_t num_functions;
-  u32_t reserved1;
-  u32_t lib_nid;
-  char     *lib_name;
-  u32_t *func_nid_table;
-  void     **func_entry_table;
-  u32_t unk1;
-  u32_t unk2;
+	u16_t size; // 0x24
+	u16_t version;
+	u16_t flags;
+	u16_t num_functions;
+	u32_t reserved1;
+	u32_t lib_nid;
+	char  *lib_name;
+	u32_t *func_nid_table;
+	void  **func_entry_table;
+	u32_t unk1;
+	u32_t unk2;
 } module_imports_2_t;
 
 typedef struct module_exports // thanks roxfan
 {
-	u16_t   size;           // size of this structure; 0x20 for Vita 1.x
-	u8_t    lib_version[2]; //
-	u16_t   attribute;      // ?
-	u16_t   num_functions;  // number of exported functions
-	u32_t   num_vars;       // number of exported variables
-	u32_t   num_tls_vars;   // number of exported TLS variables?  <-- pretty sure wrong // yifanlu
-	u32_t   module_nid;     // NID of this specific export list; one PRX can export several names
-	char    *lib_name;      // name of the export module
-	u32_t   *nid_table;     // array of 32-bit NIDs for the exports, first functions then vars
-	void    **entry_table;  // array of pointers to exported functions and then variables
+	u16_t size;           // size of this structure; 0x20 for Vita 1.x
+	u8_t  lib_version[2]; //
+	u16_t attribute;      // ?
+	u16_t num_functions;  // number of exported functions
+	u32_t num_vars;       // number of exported variables
+	u32_t num_tls_vars;   // number of exported TLS variables?  <-- pretty sure wrong // yifanlu
+	u32_t module_nid;     // NID of this specific export list; one PRX can export several names
+	char  *lib_name;      // name of the export module
+	u32_t *nid_table;     // array of 32-bit NIDs for the exports, first functions then vars
+	void  **entry_table;  // array of pointers to exported functions and then variables
 } module_exports_t;
 
 typedef struct module_info // thanks roxfan
 {
-	u16_t   modattribute;  // ??
-	u16_t   modversion;    // always 1,1?
-	char    modname[27];   ///< Name of the module
-	u8_t    type;          // 6 = user-mode prx?
-	void    *gp_value;     // always 0 on ARM
+	u16_t modattribute;  // ??
+	u16_t modversion;    // always 1,1?
+	char  modname[27];   ///< Name of the module
+	u8_t  type;          // 6 = user-mode prx?
+	void  *gp_value;     // always 0 on ARM
 	int   ent_top;       // beginning of the export list (sceModuleExports array)
 	int   ent_end;       // end of same
 	int   stub_top;      // beginning of the import list (sceModuleStubInfo array)
 	int   stub_end;      // end of same
-	u32_t   module_nid;    // ID of the PRX? seems to be unused
+	u32_t module_nid;    // ID of the PRX? seems to be unused
 	int   field_38;      // unused in samples
 	int   field_3C;      // I suspect these may contain TLS info
 	int   field_40;      //
@@ -180,11 +188,11 @@ void *memcpy(void *dst, const void *src, unsigned int len) {
 }
 
 void *memset(void *dest, int val, unsigned int len) {
-    char *ptr = (char *)dest;
-    while (len-- > 0) {
-        *ptr++ = val;
-    }
-    return dest;
+	char *ptr = (char *)dest;
+	while (len-- > 0) {
+		*ptr++ = val;
+	}
+	return dest;
 }
 
 module_info_t * find_modinfo(uint32_t start_addr, const char *needle) {
@@ -252,7 +260,6 @@ static int (*ksceIoOpen)(const char *, int, int) = 0;
 static int (*ksceIoWrite)(int, char *, int) = 0;
 static int (*ksceIoClose)(int) = 0;
 static int (*ksceAppMgrLaunchAppByPath)(const char *name, const char *cmd, int cmdlen, int, void *, void *) = 0;
-static int (*ksceAppMgrDestroyOtherAppByPid)(int pid) = 0;
 static int (*ksceKernelLoadModule)(const char *path, int flags, int *opt) = 0;
 static int (*ksceKernelStartModule)(int modid, int argc, void *args, int flags, void *opt, int *res) = 0;
 static void (*ksceKernelSetSyscall)(u32_t num, void *function) = 0;
@@ -264,7 +271,7 @@ static int (*ksceKernelExitDeleteThread)() = 0;
 static int (*ksceKernelGetMemBlockBase)(int uid, void **base) = 0;
 static int (*ksceKernelGetProcessInfo)(int pid, int *data) = 0;
 static int (*ksceKernelGetProcessLocalStorageAddrForPid)(int pid, int key, void **out_addr, int create_if_doesnt_exist) = 0;
-static int (*ksceCtrlPeekBufferPositive)(int port, void *pad_data, int count) = 0;
+static int (*ksceSblACMgrIsDevelopmentMode)(void) = 0;
 
 // context for the hooks
 static unsigned g_homebrew_decrypt = 0;
@@ -284,7 +291,6 @@ static int syscall_id = 0;
 
 // shell
 static int shell_pid = 0;
-static int app_pid = 0;
 
 int hook_SceSblAIMgrForDriver_D78B04A2(void)
 {
@@ -306,6 +312,11 @@ int hook_ksceSblAimgrIsCEX(void)
 	return 0;
 }
 
+int hook_ksceSblACMgrIsDevelopmentMode(void)
+{
+	return 1;
+}
+
 // setup file decryption
 unsigned hook_sbl_F3411881(unsigned a1, unsigned a2, unsigned a3, unsigned a4) {
 	LOG("sbl_F3411881(0x%x, 0x%x, 0x%x, 0x%x)", a1, a2, a3, a4);
@@ -316,18 +327,14 @@ unsigned hook_sbl_F3411881(unsigned a1, unsigned a2, unsigned a3, unsigned a4) {
 	u64_t authid;
 
 	if (res == 0x800f0624 || res == 0x800f0616 || res == 0x800f0024 || (res >= 0x800f0b30 && res <= 0x800f0b3f)) {
-		DACR_OFF(
-			g_homebrew_decrypt = 1;
-		);
-	// BEGIN 3.60-3.74
+		DACR_OFF(g_homebrew_decrypt = 1);
+		// BEGIN 3.60-3.74
 		somebuf[42] = 0x40;
-	// END 3.60-3.74
+		// END 3.60-3.74
 
 		return 0;
 	} else {
-		DACR_OFF(
-			g_homebrew_decrypt = 0;
-		);
+		DACR_OFF(g_homebrew_decrypt = 0);
 	}
 	return res;
 }
@@ -358,6 +365,7 @@ static char old_sblai_D78B04A2[16] = {0};
 static char old_sblai_F4B98F66[16] = {0};
 static char old_sysroot_421EFC96[16] = {0};
 static char old_ksceSblAimgrIsCEX[16] = {0};
+static char old_ksceSblACMgrIsDevelopmentMode[16] = {0};
 static char old_ux0_data_path[9] = {0};
 static void *ux0_data_path_addr = 0;
 
@@ -463,11 +471,24 @@ void temp_sigpatches(void) {
 		LOG("hooked ksceSblAimgrIsCEX");
 	}
 
+	// To bypass 0x80020012 error on FW 3.70+
+	addr = find_import(appmgr_info, 0x9AD8E213, 0xE87D1777);
+	LOG("ksceSblACMgrIsDevelopmentMode stub: %p", addr);
+	if (addr) {
+		DACR_OFF(
+			memcpy(old_ksceSblACMgrIsDevelopmentMode, addr, 16);
+			INSTALL_HOOK(hook_ksceSblACMgrIsDevelopmentMode, addr);
+			ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
+			ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
+		);
+		LOG("hooked ksceSblACMgrIsDevelopmentMode");
+	}
+
 	DACR_OFF(
 		memcpy(old_ux0_data_path, ux0_data_path_addr, sizeof(old_ux0_data_path));
 		memcpy(ux0_data_path_addr, ur0_temp_path, sizeof(ur0_temp_path));
 	);
-    LOG("hooked ux0:data path");
+	LOG("hooked ux0:data path");
 
 	DACR_OFF(has_sigpatches = 1);
 
@@ -520,10 +541,16 @@ void remove_sigpatches(void) {
 		);
 		LOG("unhooked ksceSblAimgrIsCEX");
 	}
-
+	addr = find_import(appmgr_info, 0x9AD8E213, 0xE87D1777);
+	LOG("ksceSblACMgrIsDevelopmentMode stub: %p", addr);
 	DACR_OFF(
-		memcpy(ux0_data_path_addr, old_ux0_data_path, sizeof(old_ux0_data_path));
+		memcpy(addr, old_ksceSblACMgrIsDevelopmentMode, 16);
+		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
+		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
+	LOG("unhooked ksceSblACMgrIsDevelopmentMode");
+
+	DACR_OFF(memcpy(ux0_data_path_addr, old_ux0_data_path, sizeof(old_ux0_data_path)));
 	LOG("unhooked ux0:data path");
 
 	DACR_OFF(has_sigpatches = 0);
@@ -531,7 +558,7 @@ void remove_sigpatches(void) {
 	__asm__ volatile ("isb" ::: "memory");
 }
 
-static void find_ux0_data_path_addr() {
+static void find_ux0_data_path_addr(void) {
 	char *from = (char *)(appmgr_code + appmgr_info->stub_top);
 	char *to = (char *)(appmgr_code + appmgr_size);
 	while (strcmp(from, "ux0:data") != 0 && from < (to - 8))
@@ -539,24 +566,22 @@ static void find_ux0_data_path_addr() {
 	DACR_OFF(ux0_data_path_addr = from);
 }
 
-static void get_shell_and_app_pid(int *shell_pid, int *app_pid) {
+static int get_shell_pid(void) {
 	unsigned data[0xE8/4];
-	int ret, pid, ppid;
+	int ret, ppid;
 
 	data[0] = sizeof(data);
 	ret = ksceKernelGetProcessInfo(0, data);
-	pid = data[1];
 	ppid = data[5];
 	LOG("ret: %x, ppid: %x", ret, ppid);
-	*shell_pid = ppid;
-	*app_pid = pid;
+	return ppid;
 }
 
 int load_taihen(void) {
-  int state;
+	int state;
 	int opt, taiid, modid, ret, result;
 
-  ENTER_SYSCALL(state);
+	ENTER_SYSCALL(state);
 
 	// load taiHEN
 	opt = 4;
@@ -593,10 +618,9 @@ end:
 }
 
 static void __attribute__((noinline, naked)) free_and_exit(int blk, void *free, void *lr) {
-	// now free the executable memory. this frees our current function so we have
-	// to ensure we do not return here
-	__asm__ volatile ("mov lr, %0\n"
-										"bx r1" :: "r" (lr) : "lr");
+	// now free the executable memory.
+	// this frees our current function so we have to ensure we do not return here
+	__asm__ volatile ("mov lr, %0\nbx %1" :: "r"(lr), "r"(free) : "lr");
 }
 
 void cleanup_memory(void) {
@@ -674,19 +698,10 @@ const char launch_path_ur[] = "ur0:/temp/bootstrap.self";
 const char launch_path_ux[] = "ux0:/data/bootstrap.self";
 const char launch_args[] = "\0\0\0\0-nonsuspendable\0-livearea_off\0";
 
-static int exists(const char *path) {
-	int fd = ksceIoOpen(path, 1, 0);
-	if (fd < 0)
-		return 0;
-	ksceIoClose(fd);
-	return 1;
-}
-
 int thread_main(int args, void *argp) {
 	char real_args[sizeof(launch_args)];
 	int opt[52/4];
 	int ctx[16/4];
-	unsigned pad[0x20/4];
 	const char *launch_path;
 	int fd;
 	int ret;
@@ -699,52 +714,33 @@ int thread_main(int args, void *argp) {
 	memcpy(real_args, launch_args, sizeof(launch_args));
 	*(uint16_t *)&real_args[0] = syscall_id;
 
-	ksceCtrlPeekBufferPositive(0, pad, 1);
-	if ((pad[2] & (0x200 | 0x800)) ||
-		!exists("ur0:tai/henkaku.suprx") ||
-		!exists("ur0:tai/henkaku.skprx") ||
-		!exists("ur0:tai/taihen.skprx") ||
-		(!exists("ur0:tai/config.txt") &&
-		!exists("ux0:tai/config.txt"))) {
-		LOG("Loading bootstrap to system");
+	launch_path = launch_path_ur;
+	ret = fd = ksceIoOpen(launch_path, 0x603, 0x6);
+	LOG("ur ksceIoOpen: %x", fd);
+	if (fd < 0) {
 		launch_path = launch_path_ux;
 		ret = fd = ksceIoOpen(launch_path, 0x603, 0x6);
 		LOG("ux ksceIoOpen: %x", fd);
-		if (fd < 0) {
-			launch_path = launch_path_ur;
-			fd = ksceIoOpen(launch_path, 0x603, 0x6);
-			LOG("ur ksceIoOpen: %x", fd);
-		}
-		if (fd >= 0) {
-			ret = ksceIoWrite(fd, bootstrap_self, bootstrap_self_len);
-			LOG("ksceIoWrite: %x", ret);
-			ksceIoClose(fd);
+	}
+	if (fd >= 0) {
+		ret = ksceIoWrite(fd, bootstrap_self, bootstrap_self_len);
+		LOG("ksceIoWrite: %x", ret);
+		ksceIoClose(fd);
 
-			for (int i = 0; i < sizeof(opt)/4; i++) {
-				opt[i] = 0;
-			}
-			opt[0] = sizeof(opt);
-			LOG("Launching bootstrap...");
-			ret = ksceAppMgrLaunchAppByPath(launch_path, real_args, sizeof(launch_args), 0, opt, NULL);
-			LOG("ksceAppMgrLaunchAppByPath: %x", ret);
+		for (int i = 0; i < sizeof(opt) / 4; i++) {
+			opt[i] = 0;
 		}
-		if (ret < 0) {
-			LOG("unable to write bootstrap!");
-			remove_sigpatches();
-			remove_pkgpatches();
-			__asm__ volatile ("mov lr, %0\n"
-												"mov r0, %1\n"
-												"bx r0\n" :: "r" (lr), "r" (cleanup_memory) : "r0", "lr");
-			LOG("should not be here!");
-			while (1);
-		}
-	} else {
-		ksceAppMgrDestroyOtherAppByPid(app_pid);
+		
+		opt[0] = sizeof(opt);
+		LOG("Launching bootstrap, me @ 0x%04X...", syscall_id);
+		ret = ksceAppMgrLaunchAppByPath(launch_path, real_args, sizeof(launch_args), 0, opt, NULL);
+		LOG("ksceAppMgrLaunchAppByPath: %x", ret);
+	}
+	if (ret < 0) {
+		LOG("unable to write bootstrap!");
+		remove_sigpatches();
 		remove_pkgpatches();
-		load_taihen();
-		__asm__ volatile ("mov lr, %0\n"
-											"mov r0, %1\n"
-											"bx r0\n" :: "r" (lr), "r" (cleanup_memory) : "r0", "lr");
+		__asm__ volatile ("mov lr, %0\nmov r0, %1\nbx r0\n" :: "r"(lr), "r"(cleanup_memory) : "r0", "lr");
 		LOG("should not be here!");
 		while (1);
 	}
@@ -762,17 +758,18 @@ int add_syscalls(void) {
 	return 0;
 }
 
-void resolve_imports(unsigned sysmem_base) {
+void resolve_imports(uint32_t sysmem_base) {
 	module_info_t *sysmem_info = find_modinfo(sysmem_base, "SceSysmem");
 	u32_t modulemgr_base;
 
-	// BEGIN 3.65-3.68 specific offsets here, used to find Modulemgr from just sysmem base
+	// BEGIN 3.63-3.74
+	// Used to find SceKernelModulemgr from SceSysmem's .text address
 	LOG("sysmem base: 0x%08x", sysmem_base);
 	void *sysmem_data = (void*)(*(u32_t*)((u32_t)(sysmem_base) + 0x26a28) - 0xA0);
 	LOG("sysmem data base: 0x%08x", sysmem_data);
 	modulemgr_base = (*(u32_t*)((u32_t)(sysmem_data) + 0x438c) - 0x40);
 	LOG("modulemgr base: 0x%08x", modulemgr_base);
-	// END 3.65-3.68 specific offsets
+	// END 3.63-3.74
 
 	DACR_OFF(modulemgr_info = find_modinfo((u32_t)modulemgr_base, "SceKernelModulemgr"));
 	LOG("modulemgr modinfo: 0x%08x", modulemgr_info);
@@ -794,7 +791,7 @@ void resolve_imports(unsigned sysmem_base) {
 	ret = ksceKernelGetModuleList(0x10005, 0x7FFFFFFF, 1, modlist, &modlist_records);
 	LOG("sceKernelGetModuleList() returned 0x%x", ret);
 	LOG("modlist_records: %d", modlist_records);
-	module_info_t *threadmgr_info = 0, *sblauthmgr_info = 0, *processmgr_info = 0, *ctrl_info = 0, *iofilemgr_info = 0;
+	module_info_t *threadmgr_info = 0, *sblauthmgr_info = 0, *processmgr_info = 0, *iofilemgr_info = 0, *sblacmgr_info = 0;
 	u32_t modulemgr_data = 0;
 	for (int i = 0; i < modlist_records; ++i) {
 		info.size = sizeof(info);
@@ -823,15 +820,15 @@ void resolve_imports(unsigned sysmem_base) {
 		if (strcmp(info.name, "SceProcessmgr") == 0) {
 			processmgr_info = find_modinfo((u32_t)info.segments[0].vaddr, "SceProcessmgr");
 		}
-		if (strcmp(info.name, "SceCtrl") == 0) {
-			ctrl_info = find_modinfo((u32_t)info.segments[0].vaddr, "SceCtrl");
-		}
 		if (strcmp(info.name, "SceNgs") == 0) {
 			DACR_OFF(ngs_data = (u32_t)info.segments[1].vaddr);
 		}
+		if (strcmp(info.name, "SceSblACMgr") == 0) {
+			sblacmgr_info = find_modinfo((u32_t)info.segments[0].vaddr, "SceSblACMgr");
+		}
 	}
 
-	LOG("threadmgr_info: 0x%08x | sblauthmgr_info: 0x%08x | scenpdrm_info: 0x%08x", threadmgr_info, sblauthmgr_info, scenpdrm_info);
+	LOG("threadmgr_info: 0x%08x | sblauthmgr_info: 0x%08x | scenpdrm_info: 0x%08x | sblacmgr_info: 0x%08x", threadmgr_info, sblauthmgr_info, scenpdrm_info, sblacmgr_info);
 
 	DACR_OFF(
 		hook_resume_sbl_F3411881 = find_export(sblauthmgr_info, 0xF3411881);
@@ -844,7 +841,6 @@ void resolve_imports(unsigned sysmem_base) {
 		ksceIoClose = find_export(iofilemgr_info, 0xf99dd8a3);
 		ksceIoWrite = find_export(iofilemgr_info, 0x21ee91f0);
 		ksceAppMgrLaunchAppByPath = find_export(appmgr_info, 0xB0A37065);
-		ksceAppMgrDestroyOtherAppByPid = find_export(appmgr_info, 0xFC89D33D);
 		ksceKernelLoadModule = find_export(modulemgr_info, 0x86D8D634);
 		ksceKernelStartModule = find_export(modulemgr_info, 0x0675B682);
 		ksceKernelSetSyscall = find_export(modulemgr_info, 0x2E4A10A0);
@@ -856,7 +852,7 @@ void resolve_imports(unsigned sysmem_base) {
 		ksceKernelGetMemBlockBase = find_export(sysmem_info, 0xA841EDDA);
 		ksceKernelGetProcessInfo = find_export(processmgr_info, 0x0AFF3EAE);
 		ksceKernelGetProcessLocalStorageAddrForPid = find_export(processmgr_info, 0xAF80F39C);
-		ksceCtrlPeekBufferPositive = find_export(ctrl_info, 0xEA1D3A34);
+		ksceSblACMgrIsDevelopmentMode = find_export(sblacmgr_info, 0xE87D1777);
 	);
 
 	// BEGIN 3.63-3.74
@@ -870,7 +866,7 @@ void resolve_imports(unsigned sysmem_base) {
 	// END 3.63-3.74
 }
 
-void fix_ngs() {
+void fix_ngs(void) {
 	int key;
 	void *out_addr;
 	uint32_t block_info;
@@ -929,13 +925,11 @@ void __attribute__ ((section (".text.start"))) payload(void *rx_block, uint32_t 
 	// find sysmem base, etc
 	uint32_t sysmem_base = sysmem_addr;
 	int ret;
+
 	// BEGIN 3.55-3.74
 	void (*debug_print_local)(char *s, ...) = (void*)(sysmem_base + 0x1A155);
 	// END 3.55-3.74
-
-	DACR_OFF(
-		debug_print = debug_print_local;
-	);
+	DACR_OFF(debug_print = debug_print_local);
 
 	int state;
 	ENTER_SYSCALL(state);
@@ -944,7 +938,7 @@ void __attribute__ ((section (".text.start"))) payload(void *rx_block, uint32_t 
 	flash_screen(framebuf, 0xFFFF00FF);
 
 	LOG("+++ Entered kernel payload +++");
-	LOG("payload=0x%x, size=0x%x, sp=0x%x", payload, rx_size, &ret);
+	LOG("payload=0x%x, sp=0x%x", payload, &ret);
 
 	LOG("resolving imports");
 	resolve_imports(sysmem_base);
@@ -955,8 +949,8 @@ void __attribute__ ((section (".text.start"))) payload(void *rx_block, uint32_t 
 	LOG("set up syscalls starting at id: %x", syscall_id);
 	add_syscalls();
 
-	LOG("getting shell and app pid");
-	DACR_OFF(get_shell_and_app_pid(&shell_pid, &app_pid));
+	LOG("getting shell pid");
+	DACR_OFF(shell_pid = get_shell_pid());
 
 	LOG("adding temporary patches");
 	find_ux0_data_path_addr();
@@ -964,15 +958,13 @@ void __attribute__ ((section (".text.start"))) payload(void *rx_block, uint32_t 
 	temp_sigpatches();
 
 	LOG("find rx block");
-	DACR_OFF(
-		g_rx_block = ksceKernelFindMemBlockByAddr(rx_block, 0);
-	);
+	DACR_OFF(g_rx_block = ksceKernelFindMemBlockByAddr(rx_block, 0));
 
 	LOG("flush changes");
 	void *base;
 	ret = ksceKernelGetMemBlockBase(g_rx_block, &base);
 	LOG("ksceKernelGetMemBlockBase: %x, %x", ret, base);
-	ksceKernelCpuDcacheWritebackRange((uint32_t)base, 0x1000);
+	ksceKernelCpuDcacheWritebackRange((uint32_t)base, 0x2000);
 
 	int tid;
 	LOG("starting kernel thread");
@@ -987,5 +979,5 @@ void __attribute__ ((section (".text.start"))) payload(void *rx_block, uint32_t 
 	ksceKernelExitDeleteThread(0);
 
 	LOG("should not be here!");
-	while(1) {}
+	while (1) {}
 }
