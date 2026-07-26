@@ -14,14 +14,11 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/** @defgroup Debug Debug Utility Library */
-
-/** @addtogroup Debug */
-/*@{*/
 
 /** 
   * Initialise the debug screen
@@ -35,7 +32,7 @@ void psvDebugScreenInit(void);
  * @param mode - Colour mode
  * @param setup - Setup the screen if 1
  */
-void psvDebugScreenInitEx(void *vram_base, int mode, int setup);
+void psvDebugScreenInitEx(void* vram_base, int mode, int setup);
 
 /**
   * Do a printf to the debug screen.
@@ -43,14 +40,14 @@ void psvDebugScreenInitEx(void *vram_base, int mode, int setup);
   * @param fmt - Format string to print
   * @param ... - Arguments
   */
-void psvDebugScreenPrintf(const char *fmt, ...) __attribute__((format(printf,1,2)));
+void psvDebugScreenPrintf(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 
 /**
  * Enable or disable background colour writing (defaults to enabled)
  * 
  * @param enable - Set 1 to to enable background color, 0 for disable
  */
-void psvDebugScreenEnableBackColor(int enable);
+void psvDebugScreenEnableBackColor(bool enable);
 
 /** 
   * Set the background color for the text
@@ -101,7 +98,7 @@ void psvDebugScreenSetOffset(int offset);
  *
  * @param base - Base address in bytes
  */
-void psvDebugScreenSetBase(uint32_t* base);
+void psvDebugScreenSetBase(void* base);
 
 /** 
   * Get the current X co-ordinate (in character units)
@@ -130,7 +127,7 @@ void psvDebugScreenClear(void);
   *
   * @return The number of characters written
   */
-int psvDebugScreenPrintData(const char *buff, int size);
+size_t psvDebugScreenPrintData(const char* buff, size_t size);
 
 /**
  * Print a string
@@ -139,17 +136,7 @@ int psvDebugScreenPrintData(const char *buff, int size);
  *
  * @return The number of characters written
  */
-int psvDebugScreenPuts(const char *str);
-
-/**
-  * Get a MIPS stack trace (might work :P)
-  *
-  * @param results - List of points to store the results of the trace, (up to max)
-  * @param max - Maximum number of back traces
-  *
-  * @return The number of frames stored in results.
-*/
-int psvDebugGetStackTrace(unsigned int* results, int max);
+int psvDebugScreenPuts(const char* str);
 
 /**
  * Enable the clear line function that allows debug to clear the screen
@@ -160,8 +147,6 @@ void psvDebugScreenClearLineEnable(void);
  * Disable the clear line function that causes flicker on constant refreshes
 */
 void psvDebugScreenClearLineDisable(void);
-
-/*@}*/
 
 #ifdef __cplusplus
 }

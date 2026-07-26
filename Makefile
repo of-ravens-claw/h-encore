@@ -6,8 +6,8 @@ exploit:
 	cd payload; make; rm ../stage2/payload.bin.gz; gzip -9 -n -c payload.bin > ../stage2/payload.bin.gz
 	cd stage2; make
 	cd stage1; make
-	./scripts/obfuscate.py stage1/stage1.bin 1
-	./scripts/obfuscate.py stage2/stage2.bin 2
+#	./scripts/obfuscate.py stage1/stage1.bin 1
+#	./scripts/obfuscate.py stage2/stage2.bin 2
 	./scripts/trim.py stage2/stage2.bin
 	./scripts/generate.py stage1/stage1.bin stage2/stage2.bin system.dat
 

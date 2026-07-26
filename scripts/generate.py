@@ -47,6 +47,9 @@ def gen_random_gadget():
                 if byte == "\x0A" or byte == "\x0D":
                     valid = False
                     break
+
+    random_gadget = struct.pack("I", 0xDEADBEEF)
+    print(f"gen_random_gadget: 0x{random_gadget[::-1].hex().upper()}")
     return random_gadget
 
 
