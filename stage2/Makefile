@@ -5,7 +5,8 @@ PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
 AS      = $(PREFIX)-as
 OBJCOPY = $(PREFIX)-objcopy
-CFLAGS  =
+CFLAGS  = -DFW=$(FW)
+ASFLAGS = -DFW=$(FW)
 LDFLAGS = -T linker.x -nostartfiles
 
 all: $(TARGET).bin

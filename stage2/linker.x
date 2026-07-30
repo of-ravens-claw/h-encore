@@ -5,5 +5,5 @@ ENTRY(_start)
 
 SECTIONS
 {
-  . = 0x81e82000;
+  . = 0x81E82000;
 }

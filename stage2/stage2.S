@@ -10,7 +10,7 @@
 .include "../include/functions.S"
 .include "../include/gadgets.S"
 .include "../include/macros.S"
-.include "krop.S"
+#include "krop.S"
 
 // Kernel stack base start and step
 .equ KSTACK_BASE_START,      0x1000
@@ -28,19 +28,7 @@
 // copyout params offset
 .equ COPYOUT_PARAMS_OFFSET,  0xa0
 
-// SceLibKernel offsets
-.equ SCE_LIB_KERNEL_OFFSET,  -0xa4b7
-.equ GET_MODULE_LIST_OFFSET, 0x675c
-.equ GET_MODULE_INFO_OFFSET, 0x676c
-.equ GET_THREAD_INFO_OFFSET, 0xa791
-.equ DEVCTL_OFFSET,          0xa55d
-
-// SceNgsUser offsets
-.equ SYSTEM_GET_SIZE_OFFSET, 0x54d
-.equ SYSTEM_INIT_OFFSET,     0x57d
-.equ RACK_GET_SIZE_OFFSET,   0xb29
-.equ RACK_INIT_OFFSET,       0xb65
-.equ RACK_RELEASE_OFFSET,    0xda1
+#include "offsets.S"
 
 .macro set_preset i, src, size
   .set index, (\i) * 0x18

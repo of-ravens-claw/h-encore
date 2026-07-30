@@ -956,7 +956,7 @@ void resolve_imports(uint32_t sysmem_base)
 
 void fix_ngs(void)
 {	
-	// Get bitter smile's process id
+	// Get the process id
 	uint32_t data[0xE8/4] = { 0 };
 	data[0] = sizeof(data);
 	ksceKernelGetProcessInfo(0, data);

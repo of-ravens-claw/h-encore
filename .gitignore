@@ -3,6 +3,8 @@ build/
 coredumps/
 bootstrap/res/*
 payload/bootstrap.h
+stage2/krop_bytes.txt
+upload.sh
 *.o
 *.elf
 *.bin
