@@ -275,9 +275,9 @@ void* find_import(module_info_t* mod, uint32_t lnid, uint32_t fnid)
 static int (*sceKernelPrintf)(const char* fmt, ...) = 0;
 #endif
 
-static int (*hook_resume_sbl_F3411881)() = 0;
-static int (*hook_resume_sbl_89CCDA2C)() = 0;
-static int (*hook_resume_sbl_BC422443)() = 0;
+static int (*hook_resume_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp)() = 0;
+static int (*hook_resume_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp)() = 0;
+static int (*hook_resume_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp)() = 0;
 
 static int (*ksceKernelGetModuleList)() = 0;
 static int (*ksceKernelGetModuleInfo)() = 0;
@@ -323,38 +323,115 @@ static int shell_pid = 0;
 static bool has_taihen = false;
 #endif
 
-int hook_SceSblAIMgrForDriver_D78B04A2(void)
+
+#define FILE_LOGGING
+
+#ifdef FILE_LOGGING
+
+#define LOG_LOC "ux0:payload.log"
+
+size_t my_strlen(const char* str)
+{
+	const char* s = str;
+	while (*s != '\0')
+		s++;
+
+	return s - str;
+}
+
+static int (*ptr_snprintf)(char* str, size_t size, const char* format, ...) = NULL;
+
+#define FLOG(fmt, ...) \
+do { \
+	char buffer[256]; \
+	buffer[0] = 0; \
+	ptr_snprintf(buffer, sizeof(buffer), "[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
+	logg(buffer, my_strlen(buffer), LOG_LOC, 2); \
+} while (0)
+
+#define FLOG_START(fmt, ...) \
+do { \
+	char buffer[256]; \
+	buffer[0] = 0; \
+	ptr_snprintf(buffer, sizeof(buffer), "[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
+	logg(buffer, my_strlen(buffer), LOG_LOC, 1); \
+} while (0)
+
+typedef enum bare_SceIoMode
+{
+	SCE_O_WRONLY = 0x0002, //!< Write-only
+	SCE_O_APPEND = 0x0100, //!< Append
+	SCE_O_CREAT  = 0x0200, //!< Create
+	SCE_O_TRUNC  = 0x0400, //!< Truncate
+} bare_SceIoMode;
+
+static int logg(const void* buffer, int length, const char* logloc, int create)
+{
+	if (!ksceIoOpen || !ksceIoWrite || !ksceIoClose)
+		return 0;
+
+	int fd;
+
+	if (create == 0)
+		fd = ksceIoOpen(logloc, SCE_O_WRONLY | SCE_O_APPEND, 6);
+	else if (create == 1)
+		fd = ksceIoOpen(logloc, SCE_O_WRONLY | SCE_O_TRUNC | SCE_O_CREAT, 6);
+	else if (create == 2)
+		fd = ksceIoOpen(logloc, SCE_O_WRONLY | SCE_O_APPEND | SCE_O_CREAT, 6);
+	else
+		fd = -1;
+	
+	if (fd < 0)
+		return 0;
+
+	ksceIoWrite(fd, buffer, length);
+	ksceIoClose(fd);
+	return 1;
+}
+#else
+#define FLOG(...)
+#define FLOG_START(...)
+#endif
+
+int hook_sceSblAIMgrIsCEX_SceNpDrm_imp(void)
 {
 	return 1;
 }
 
-int hook_SceSblAIMgrForDriver_F4B98F66(void)
+int hook_sceSblAIMgrIsDEX_SceNpDrm_imp(void)
 {
 	return 1;
 }
 
-int hook_sysroot_421EFC96(void)
+int hook_SceSysrootForDriver_421EFC96_SceAppMgr_imp(void)
 {
 	return 0;
 }
 
-int hook_ksceSblAimgrIsCEX(void)
+int hook_sceSblAIMgrIsCEX_SceAppMgr_imp(void)
 {
 	return 0;
 }
 
-int hook_ksceSblACMgrIsDevelopmentMode(void)
+int hook_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp(void)
 {
 	return 1;
+}
+
+int hook_SceProcessmgrForDriver_C715591F_SceAppMgr_imp(void)
+{
+	return 0;
 }
 
 // setup file decryption
-unsigned hook_sbl_F3411881(unsigned a1, unsigned a2, unsigned a3, unsigned a4)
+unsigned hook_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(unsigned a1, unsigned a2, unsigned a3, unsigned a4)
 {
-	LOG("sbl_F3411881(0x%x, 0x%x, 0x%x, 0x%x)", a1, a2, a3, a4);
+	LOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(0x%x, 0x%x, 0x%x, 0x%x)", a1, a2, a3, a4);
+	FLOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(0x%08X, 0x%08X, 0x%08X, 0x%08X)", a1, a2, a3, a4);
 
-	unsigned res = hook_resume_sbl_F3411881(a1, a2, a3, a4);
-	LOG("sbl_F3411881: %x", res);
+	unsigned res = hook_resume_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(a1, a2, a3, a4);
+	LOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp: %x", res);
+	FLOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp: 0x%08X", res);
 	unsigned* somebuf = (unsigned*)a4;
 	uint64_t authid;
 
@@ -372,36 +449,39 @@ unsigned hook_sbl_F3411881(unsigned a1, unsigned a2, unsigned a3, unsigned a4)
 }
 
 // setup output buffer
-unsigned hook_sbl_89CCDA2C(unsigned a1, unsigned a2)
+unsigned hook_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(unsigned a1, unsigned a2)
 {
-	LOG("sbl_89CCDA2C(0x%x, 0x%x) hb=0x%x", a1, a2, g_homebrew_decrypt);
+	LOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(0x%x, 0x%x) hb=0x%x", a1, a2, g_homebrew_decrypt);
+	FLOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(0x%08X, 0x%08X) 0x%08X", a1, a2, g_homebrew_decrypt);
 	if (g_homebrew_decrypt == 1)
 		return 2; // always compressed!
-	return hook_resume_sbl_89CCDA2C(a1, a2);
+	return hook_resume_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(a1, a2);
 }
 
 // decrypt
-unsigned hook_sbl_BC422443(unsigned a1, unsigned a2, unsigned a3)
+unsigned hook_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(unsigned a1, unsigned a2, unsigned a3)
 {
-	LOG("sbl_BC422443(0x%x, 0x%x, 0x%x) hb=0x%x", a1, a2, a3, g_homebrew_decrypt);
+	LOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(0x%x, 0x%x, 0x%x) hb=0x%x", a1, a2, a3, g_homebrew_decrypt);
+	FLOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(0x%08X, 0x%08X, 0x%08X) hb=0x%08X", a1, a2, a3, g_homebrew_decrypt);
 	if (g_homebrew_decrypt == 1)
 		return 0;
-	return hook_resume_sbl_BC422443(a1, a2, a3);
+	return hook_resume_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(a1, a2, a3);
 }
 
 static const char ur0_temp_path[] = "ur0:temp";
 
 static bool  has_sigpatches = 0;
-static char  old_sbl_F3411881[16] = {0};
-static char  old_sbl_89CCDA2C[16] = {0};
-static char  old_sbl_BC422443[16] = {0};
-static char  old_sblai_D78B04A2[16] = {0};
-static char  old_sblai_F4B98F66[16] = {0};
-static char  old_sysroot_421EFC96[16] = {0};
-static char  old_ksceSblAimgrIsCEX[16] = {0};
-static char  old_ksceSblACMgrIsDevelopmentMode[16] = {0};
+static char  old_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp[16] = {0};
+static char  old_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp[16] = {0};
+static char  old_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp[16] = {0};
+static char  old_sceSblAIMgrIsCEX_SceNpDrm_imp[16] = {0};
+static char  old_sceSblAIMgrIsDEX_SceNpDrm_imp[16] = {0};
+static char  old_SceSysrootForDriver_421EFC96_SceAppMgr_imp[16] = {0};
+static char  old_sceSblAIMgrIsCEX_SceAppMgr_imp[16] = {0};
+static char  old_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp[16] = {0};
+static char  old_SceProcessmgrForDriver_C715591F_SceAppMgr_imp[16] = {0};
 static char  old_ux0_data_path[9] = {0};
-static void* ux0_data_path_addr = 0;
+static void* ux0_data_path_addr = NULL;
 
 void temp_pkgpatches(void)
 {
@@ -409,24 +489,24 @@ void temp_pkgpatches(void)
 	LOG("inserting temporary package patches");
 
 	addr = find_import(scenpdrm_info, 0xFD00C69A, 0xD78B04A2);
-	LOG("sblai_D78B04A2 stub: %p", addr);
+	LOG("sceSblAIMgrIsCEX_SceNpDrm_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(old_sblai_D78B04A2, addr, 16);
-		INSTALL_HOOK(hook_SceSblAIMgrForDriver_D78B04A2, addr);
+		memcpy(old_sceSblAIMgrIsCEX_SceNpDrm_imp, addr, 16);
+		INSTALL_HOOK(hook_sceSblAIMgrIsCEX_SceNpDrm_imp, addr);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("hooked sblai_D78B04A2");
+	LOG("hooked sceSblAIMgrIsCEX_SceNpDrm_imp");
 
 	addr = find_import(scenpdrm_info, 0xFD00C69A, 0xF4B98F66);
-	LOG("sblai_F4B98F66 stub: %p", addr);
+	LOG("sceSblAIMgrIsDEX_SceNpDrm_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(old_sblai_F4B98F66, addr, 16);
-		INSTALL_HOOK(hook_SceSblAIMgrForDriver_F4B98F66, addr);
+		memcpy(old_sceSblAIMgrIsDEX_SceNpDrm_imp, addr, 16);
+		INSTALL_HOOK(hook_sceSblAIMgrIsDEX_SceNpDrm_imp, addr);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("hooked sblai_F4B98F66");
+	LOG("hooked sceSblAIMgrIsDEX_SceNpDrm_imp");
 
 	__asm__ volatile ("isb" ::: "memory");
 }
@@ -437,22 +517,22 @@ void remove_pkgpatches(void)
 	LOG("removing temporary package patches");
 
 	addr = find_import(scenpdrm_info, 0xFD00C69A, 0xD78B04A2);
-	LOG("sblai_D78B04A2 stub: %p", addr);
+	LOG("sceSblAIMgrIsCEX_SceNpDrm_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(addr, old_sblai_D78B04A2, 16);
+		memcpy(addr, old_sceSblAIMgrIsCEX_SceNpDrm_imp, 16);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
+	LOG("unhooked sceSblAIMgrIsCEX_SceNpDrm_imp");
 
-	LOG("unhooked sblai_D78B04A2");
 	addr = find_import(scenpdrm_info, 0xFD00C69A, 0xF4B98F66);
-	LOG("sblai_F4B98F66 stub: %p", addr);
+	LOG("sceSblAIMgrIsDEX_SceNpDrm_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(addr, old_sblai_F4B98F66, 16);
+		memcpy(addr, old_sceSblAIMgrIsDEX_SceNpDrm_imp, 16);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("unhooked sblai_F4B98F66");
+	LOG("unhooked sceSblAIMgrIsDEX_SceNpDrm_imp");
 
 	__asm__ volatile ("isb" ::: "memory");
 }
@@ -463,72 +543,87 @@ void temp_sigpatches(void)
 	LOG("inserting temporary signature patches");
 
 	addr = find_import(modulemgr_info, 0x7ABF5135, 0xF3411881);
-	LOG("sbl_F3411881 stub: %p\n", addr);
+	LOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp stub: %p\n", addr);
 	DACR_OFF(
-		memcpy(old_sbl_F3411881, addr, 16);
-		INSTALL_HOOK(hook_sbl_F3411881, addr);
+		memcpy(old_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp, addr, 16);
+		INSTALL_HOOK(hook_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp, addr);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("hooked sbl_F3411881");
+	LOG("hooked sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp");
 
 	addr = find_import(modulemgr_info, 0x7ABF5135, 0x89CCDA2C);
-	LOG("sbl_89CCDA2C stub: %p", addr);
-	DACR_OFF(memcpy(old_sbl_89CCDA2C, addr, 16));
+	LOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp stub: %p", addr);
+	DACR_OFF(memcpy(old_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp, addr, 16));
 	DACR_OFF(
-		memcpy(old_sbl_89CCDA2C, addr, 16);
-		INSTALL_HOOK(hook_sbl_89CCDA2C, addr);
+		memcpy(old_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp, addr, 16);
+		INSTALL_HOOK(hook_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp, addr);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("hooked sbl_89CCDA2C");
+	LOG("hooked sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp");
 
 	addr = find_import(modulemgr_info, 0x7ABF5135, 0xBC422443);
-	LOG("sbl_BC422443 stub: %p", addr);
+	LOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(old_sbl_BC422443, addr, 16);
-		INSTALL_HOOK(hook_sbl_BC422443, addr);
+		memcpy(old_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp, addr, 16);
+		INSTALL_HOOK(hook_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp, addr);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("hooked sbl_BC422443");
+	LOG("hooked sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp");
 
 	addr = find_import(appmgr_info, 0x2ED7F97A, 0x421EFC96);
-	LOG("sysroot_421EFC96 stub: %p", addr);
+	LOG("SceSysrootForDriver_421EFC96_SceAppMgr_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(old_sysroot_421EFC96, addr, 16);
-		INSTALL_HOOK(hook_sysroot_421EFC96, addr);
+		memcpy(old_SceSysrootForDriver_421EFC96_SceAppMgr_imp, addr, 16);
+		INSTALL_HOOK(hook_SceSysrootForDriver_421EFC96_SceAppMgr_imp, addr);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("hooked sysroot_421EFC96");
+	LOG("hooked SceSysrootForDriver_421EFC96_SceAppMgr_imp");
 
 	// To bypass 0x8080004C error on FW 3.60+
 	addr = find_import(appmgr_info, 0xFD00C69A, 0xD78B04A2);
-	LOG("ksceSblAimgrIsCEX stub: %p", addr);
+	LOG("sceSblAIMgrIsCEX_SceAppMgr_imp stub: %p", addr);
 	if (addr)
 	{
 		DACR_OFF(
-			memcpy(old_ksceSblAimgrIsCEX, addr, 16);
-			INSTALL_HOOK(hook_ksceSblAimgrIsCEX, addr);
+			memcpy(old_sceSblAIMgrIsCEX_SceAppMgr_imp, addr, 16);
+			INSTALL_HOOK(hook_sceSblAIMgrIsCEX_SceAppMgr_imp, addr);
 			ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 			ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 		);
-		LOG("hooked ksceSblAimgrIsCEX");
+		LOG("hooked sceSblAIMgrIsCEX_SceAppMgr_imp");
 	}
 
 	// To bypass 0x80020012 error on FW 3.70+
 	addr = find_import(appmgr_info, 0x9AD8E213, 0xE87D1777);
-	LOG("ksceSblACMgrIsDevelopmentMode stub: %p", addr);
+	LOG("sceSblACMgrIsDevelopmentMode_SceAppMgr_imp stub: %p", addr);
 	if (addr)
 	{
 		DACR_OFF(
-			memcpy(old_ksceSblACMgrIsDevelopmentMode, addr, 16);
-			INSTALL_HOOK(hook_ksceSblACMgrIsDevelopmentMode, addr);
+			memcpy(old_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp, addr, 16);
+			INSTALL_HOOK(hook_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp, addr);
 			ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 			ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 		);
-		LOG("hooked ksceSblACMgrIsDevelopmentMode");
+		LOG("hooked sceSblACMgrIsDevelopmentMode_SceAppMgr_imp");
+	}
+
+	// To bypass 0x80802025 error on FW 3.50
+	// TODO: I really don't like this, is there no better way..?
+	addr = find_import(appmgr_info, 0x746EC971, 0xC715591F);
+	LOG("SceProcessmgrForDriver_C715591F_SceAppMgr_imp stub: %p", addr);
+	if (addr)
+	{
+		DACR_OFF(
+			memcpy(old_SceProcessmgrForDriver_C715591F_SceAppMgr_imp, addr, 16);
+			INSTALL_HOOK(hook_SceProcessmgrForDriver_C715591F_SceAppMgr_imp, addr);
+			ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
+			ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
+		);
+		LOG("hooked SceProcessmgrForDriver_C715591F_SceAppMgr_imp");
 	}
 
 	DACR_OFF(
@@ -551,61 +646,76 @@ void remove_sigpatches(void)
 	LOG("removing temporary signature patches");
 
 	addr = find_import(modulemgr_info, 0x7ABF5135, 0xF3411881);
-	LOG("sbl_F3411881 stub: %p", addr);
+	LOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(addr, old_sbl_F3411881, 16);
+		memcpy(addr, old_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp, 16);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("unhooked sbl_F3411881");
+	LOG("unhooked sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp");
 
 	addr = find_import(modulemgr_info, 0x7ABF5135, 0x89CCDA2C);
-	LOG("sbl_89CCDA2C stub: %p", addr);
+	LOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(addr, old_sbl_89CCDA2C, 16);
+		memcpy(addr, old_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp, 16);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("unhooked sbl_89CCDA2C");
+	LOG("unhooked sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp");
 
 	addr = find_import(modulemgr_info, 0x7ABF5135, 0xBC422443);
-	LOG("sbl_BC422443 stub: %p", addr);
+	LOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(addr, old_sbl_BC422443, 16);
+		memcpy(addr, old_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp, 16);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("unhooked sbl_BC422443");
+	LOG("unhooked sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp");
 
 	addr = find_import(appmgr_info, 0x2ED7F97A, 0x421EFC96);
-	LOG("sysroot_421EFC96 stub: %p", addr);
+	LOG("SceSysrootForDriver_421EFC96_SceAppMgr_imp stub: %p", addr);
 	DACR_OFF(
-		memcpy(addr, old_sysroot_421EFC96, 16);
+		memcpy(addr, old_SceSysrootForDriver_421EFC96_SceAppMgr_imp, 16);
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 	);
-	LOG("unhooked sysroot_421EFC96");
+	LOG("unhooked SceSysrootForDriver_421EFC96_SceAppMgr_imp");
 
 	addr = find_import(appmgr_info, 0xFD00C69A, 0xD78B04A2);
-	LOG("ksceSblAimgrIsCEX stub: %p", addr);
+	LOG("sceSblAIMgrIsCEX_SceAppMgr_imp stub: %p", addr);
 	if (addr)
 	{
 		DACR_OFF(
-			memcpy(addr, old_ksceSblAimgrIsCEX, 16);
+			memcpy(addr, old_sceSblAIMgrIsCEX_SceAppMgr_imp, 16);
 			ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
 			ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
 		);
-		LOG("unhooked ksceSblAimgrIsCEX");
+		LOG("unhooked sceSblAIMgrIsCEX_SceAppMgr_imp");
 	}
 
 	addr = find_import(appmgr_info, 0x9AD8E213, 0xE87D1777);
-	LOG("ksceSblACMgrIsDevelopmentMode stub: %p", addr);
-	DACR_OFF(
-		memcpy(addr, old_ksceSblACMgrIsDevelopmentMode, 16);
-		ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
-		ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
-	);
-	LOG("unhooked ksceSblACMgrIsDevelopmentMode");
+	if (addr)
+	{
+		LOG("sceSblACMgrIsDevelopmentMode_SceAppMgr_imp stub: %p", addr);
+		DACR_OFF(
+			memcpy(addr, old_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp, 16);
+			ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
+			ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
+		);
+		LOG("unhooked sceSblACMgrIsDevelopmentMode_SceAppMgr_imp");
+	}
+
+	addr = find_import(appmgr_info, 0x746EC971, 0xC715591F);
+	LOG("SceProcessmgrForDriver_C715591F_SceAppMgr_imp stub: %p", addr);
+	if (addr)
+	{
+		DACR_OFF(
+			memcpy(addr, old_SceProcessmgrForDriver_C715591F_SceAppMgr_imp, 16);
+			ksceKernelCpuIcacheAndL2WritebackInvalidateRange((uint32_t)addr & ~0x1F, 0x20);
+			ksceKernelCpuDcacheWritebackRange((uint32_t)addr & ~0x1F, 0x20);
+		);
+		LOG("unhooked SceProcessmgrForDriver_C715591F_SceAppMgr_imp");
+	}
 
 	DACR_OFF(memcpy(ux0_data_path_addr, old_ux0_data_path, sizeof(old_ux0_data_path)));
 	LOG("unhooked ux0:data path");
@@ -699,10 +809,12 @@ void cleanup_memory(void)
 	__asm__ volatile ("mov %0, lr" : "=r" (lr));
 
 	LOG("calling cleanup from %x", lr);
+	FLOG("calling cleanup from 0x%08X", lr);
 	// TODO: Delete bootstrap.self (#37)
 
 	// remove syscalls
 	LOG("removing syscalls");
+	FLOG("removing syscalls");
 	ksceKernelSetSyscall(syscall_id + 0, syscall_stub);
 	ksceKernelSetSyscall(syscall_id + 1, syscall_stub);
 	ksceKernelSetSyscall(syscall_id + 2, syscall_stub);
@@ -712,6 +824,7 @@ void cleanup_memory(void)
 		*syscall_lo = syscall_id;
 
 	LOG("freeing executable memory");
+	FLOG("freeing executable memory");
 	return free_and_exit(g_rx_block, ksceKernelFreeMemBlock, lr);
 }
 
@@ -723,6 +836,17 @@ int mount_savedata(int pid)
 
 	switch (appmgr_info->module_nid)
 	{
+		case 0xE2EDFCC3: // 3.50
+			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
+			sceAppMgrMountById = (void*)(appmgr_code + 0x198E9);
+			break;
+
+		case 0x8C76997D: // 3.51
+		case 0x1D32C3FF: // 3.52
+			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
+			sceAppMgrMountById = (void*)(appmgr_code + 0x19D5D);
+			break;
+
 		case 0x94CEFE4B: // 3.55
 		case 0xDFBC288C: // 3.57
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
@@ -761,6 +885,9 @@ int mount_savedata(int pid)
 			return -1;
 	}
 
+	if (!sceAppMgrFindProcessInfoByPid || !sceAppMgrMountById)
+		return -1;
+
 	void* info = sceAppMgrFindProcessInfoByPid((void*)(appmgr_data + 0x500), pid);
 	if (!info)
 		return -1;
@@ -779,6 +906,7 @@ int thread_main(int args, void* argp)
 	void* lr = NULL;
 	__asm__ volatile("mov %0, lr" : "=r"(lr));
 	LOG("Main kernel thread, called from %x!", lr);
+	FLOG("Main kernel thread, called from 0x%08X!", lr);
 
 	char real_args[sizeof(launch_args)];
 	memcpy(real_args, launch_args, sizeof(launch_args));
@@ -788,12 +916,14 @@ int thread_main(int args, void* argp)
 	int fd  = ksceIoOpen(launch_path, 0x603, 0006);
 	int ret = fd;
 	LOG("ux ksceIoOpen: %x", fd);
+	FLOG("ux ksceIoOpen: 0x%08X", fd);
 	if (fd < 0)
 	{
 		launch_path = launch_path_ur;
 		fd  = ksceIoOpen(launch_path, 0x603, 0006);
 		ret = fd;
 		LOG("ur ksceIoOpen: %x", fd);
+		FLOG("ur ksceIoOpen: 0x%08X", fd);
 	}
 	if (fd >= 0)
 	{
@@ -804,20 +934,25 @@ int thread_main(int args, void* argp)
 		int opt[52/4] = { 0 };
 		opt[0] = sizeof(opt);
 		LOG("Launching bootstrap, me @ 0x%04X...", syscall_id);
+		FLOG("Launching bootstrap, me @ 0x%04X...", syscall_id);
 		ret = ksceAppMgrLaunchAppByPath(launch_path, real_args, sizeof(launch_args), 0, opt, NULL);
 		LOG("ksceAppMgrLaunchAppByPath: %x", ret);
+		FLOG("ksceAppMgrLaunchAppByPath: 0x%08X", ret);
 	}
 	if (ret < 0)
 	{
 		LOG("unable to write bootstrap!");
+		FLOG("unable to write bootstrap!");
 		remove_sigpatches();
 		remove_pkgpatches();
 		__asm__ volatile ("mov lr, %0\nmov r0, %1\nbx r0\n" :: "r"(lr), "r"(cleanup_memory) : "r0", "lr");
 		LOG("should not be here!");
+		FLOG("should not be here!");
 		while (true) { }
 	}
 
 	LOG("done with kernel thread!");
+	FLOG("done with kernel thread!");
 	return 0;
 }
 
@@ -920,9 +1055,9 @@ void resolve_imports(uint32_t sysmem_base)
 	LOG("threadmgr_info: 0x%08x | sblauthmgr_info: 0x%08x | scenpdrm_info: 0x%08x | sblacmgr_info: 0x%08x", threadmgr_info, sblauthmgr_info, scenpdrm_info, sblacmgr_info);
 
 	DACR_OFF(
-		hook_resume_sbl_F3411881 = find_export(sblauthmgr_info, 0xF3411881);
-		hook_resume_sbl_89CCDA2C = find_export(sblauthmgr_info, 0x89CCDA2C);
-		hook_resume_sbl_BC422443 = find_export(sblauthmgr_info, 0xBC422443);
+		hook_resume_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp = find_export(sblauthmgr_info, 0xF3411881);
+		hook_resume_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp = find_export(sblauthmgr_info, 0x89CCDA2C);
+		hook_resume_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp = find_export(sblauthmgr_info, 0xBC422443);
 
 		ksceKernelCpuIcacheAndL2WritebackInvalidateRange = find_export(sysmem_info, SYSMEM_ICACHEINVALIDATERANGE_NID);
 		ksceKernelCpuDcacheWritebackRange = find_export(sysmem_info, 0x9CB9F0CE);
@@ -933,7 +1068,7 @@ void resolve_imports(uint32_t sysmem_base)
 		ksceKernelLoadModule = find_export(modulemgr_info, 0x86D8D634);
 		ksceKernelStartModule = find_export(modulemgr_info, 0x0675B682);
 		ksceKernelSetSyscall = find_export(modulemgr_info, MODULEMGR_REGISTERSYSCALL_NID);
-		ksceKernelFreeMemBlock = find_export(sysmem_info, 0x9e1c61);
+		ksceKernelFreeMemBlock = find_export(sysmem_info, 0x009e1c61);
 		ksceKernelFindMemBlockByAddr = find_export(sysmem_info, 0x8a1742f6);
 		ksceKernelCreateThread = find_export(threadmgr_info, 0xC6674E7D);
 		ksceKernelStartThread = find_export(threadmgr_info, 0x21F5419B);
@@ -942,6 +1077,10 @@ void resolve_imports(uint32_t sysmem_base)
 		ksceKernelGetProcessInfo = find_export(processmgr_info, 0x0AFF3EAE);
 		ksceKernelGetProcessLocalStorageAddrForPid = find_export(processmgr_info, 0xAF80F39C);
 		ksceSblACMgrIsDevelopmentMode = find_export(sblacmgr_info, 0xE87D1777);
+
+#ifdef FILE_LOGGING
+		ptr_snprintf = find_export(sysmem_info, 0xAE7A8981);
+#endif
 	);
 
 	DACR_OFF(
@@ -982,6 +1121,7 @@ void fix_ngs(void)
 	}
 }
 
+// Color is in the following format: AABBGGRR
 void flash_screen(uint32_t framebuf, uint32_t color)
 {
 	uint32_t prev_dacr;
@@ -1059,10 +1199,10 @@ void __attribute__((section(".text.start"))) payload(void* rx_block, uint32_t sy
 	void* base = NULL;
 	ret = ksceKernelGetMemBlockBase(g_rx_block, &base);
 	LOG("ksceKernelGetMemBlockBase: %x, %x", ret, base);
-	ksceKernelCpuDcacheWritebackRange((uint32_t)base, 0x1000);
+	ksceKernelCpuDcacheWritebackRange((uint32_t)base, 0x4000);
 
 	LOG("starting kernel thread");
-	int tid = ksceKernelCreateThread("stage2", thread_main, 64, 0x1000, 0, 0, 0);
+	int tid = ksceKernelCreateThread("stage2", thread_main, 64, 0x4000, 0, 0, 0);
 	LOG("create tid: %x", tid);
 	ret = ksceKernelStartThread(tid, 0, NULL);
 	LOG("start thread: %x", ret);

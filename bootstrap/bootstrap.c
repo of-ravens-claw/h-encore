@@ -465,12 +465,20 @@ void print_result(int res)
 	sceKernelDelayThread((res < 0) ? (5 * 1000 * 1000) : (1 * 1000 * 1000));
 }
 
+uint32_t cur_fw_version = 0xFFFFFFFF;
 int print_menu(int sel)
 {
 	psvDebugScreenSetXY(0, 0);
 	psvDebugScreenSetTextColor(AZURE);
 	printf("\n h-encore bootstrap menu\n");
-	printf(" Built on " __DATE__ " at " __TIME__ "!\n\n");
+	printf(" Built on " __DATE__ " at " __TIME__ "!\n");
+	if (cur_fw_version != 0xFFFFFFFF)
+	{
+		if ((cur_fw_version & 0x0000F000) != 0) // Unlikely, only 1.691 and 1.692.
+			printf(" Firmware version: %X.%03X\n\n", (cur_fw_version >> 24) & 0xFF, (cur_fw_version >> 12) & 0xFFF);
+		else
+			printf(" Firmware version: %X.%02X\n\n", (cur_fw_version >> 24) & 0xFF, (cur_fw_version >> 16) & 0xFF);
+	}
 
 	for (int i = 0; i < N_ITEMS; i++)
 	{
@@ -491,6 +499,12 @@ int module_start(SceSize args, void* argp)
 	int res = -1;
 	int syscall_id = *(uint16_t*)argp;
 	sceClibPrintf("syscall_id: 0x%04X\n", syscall_id);
+
+	SceKernelSystemSwVersion ver;
+	sceClibMemset(&ver, 0, sizeof(ver));
+	ver.size = sizeof(ver);
+	if (sceKernelGetSystemSwVersion(&ver) >= 0)
+		cur_fw_version = ver.version;
 
 	sceAppMgrDestroyOtherApp();
 
@@ -535,6 +549,25 @@ int module_start(SceSize args, void* argp)
 				sel = 0;
 
 			print_menu(sel);
+		}
+
+		// Quit and clean up nicely, without starting HENkaku.
+		// This is intended as a proof-of-concept, since porting taiHEN/HENkaku is annoying.
+		if (pressed_buttons & SCE_CTRL_SELECT)
+		{
+			sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);
+
+			// Remove pkg patches
+			call_syscall(0, 0, 0, syscall_id + 1);
+
+			// Remove sig patches
+			call_syscall(0, 0, 0, syscall_id + 2);
+
+			// Clean up
+			call_syscall(0, 0, 0, syscall_id + 3);
+
+			sceKernelExitProcess(0);
+			return 0;
 		}
 
 		if ((enter_cross && pressed_buttons & SCE_CTRL_CROSS) || (!enter_cross && pressed_buttons & SCE_CTRL_CIRCLE))
