@@ -3,7 +3,11 @@
 #endif
 
 // SceKernelModuleMgr
-#if   FW >= 350 && FW <= 352
+#if   FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
+#define MODULEMGR_BACKTRACE_OFFSET     0x00040 // From .text base
+#define MODULEMGR_SYSCALL_STUB_OFFSET  0x08579 // From .text base
+#define MODULEMGR_SYSCALL_LO_OFFSET    0x00340 // From .data base
+#elif FW >= 350 && FW <= 352
 #define MODULEMGR_BACKTRACE_OFFSET     0x00040 // From .text base
 #define MODULEMGR_SYSCALL_STUB_OFFSET  0x08B15 // From .text base
 #define MODULEMGR_SYSCALL_LO_OFFSET    0x0033C // From .data base
@@ -21,8 +25,29 @@
 #define MODULEMGR_SYSCALL_LO_OFFSET    0x2038C // From .data base
 #endif
 
+// SceNetPs
+#if   FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
+#define NETPS_BNET_MUTEX_UNLOCK_OFFSET 0x29641 // from .text base
+#define NETPS_BNET_JUMBO_MUTEX_OFFSET  0x00850 // from .data base
+#elif FW == 350 /* unsure... */
+#define NETPS_BNET_MUTEX_UNLOCK_OFFSET 0x2A149 // from .text base (different function, but this is what code calls, so...)
+#define NETPS_BNET_JUMBO_MUTEX_OFFSET  0x00850 // from .data base
+#elif FW >= 351 && FW <= 352
+#define NETPS_BNET_MUTEX_UNLOCK_OFFSET 0x2A0A5 // from .text base
+#define NETPS_BNET_JUMBO_MUTEX_OFFSET  0x00850 // from .data base
+#elif FW >= 355 && FW <= 361 /* 3.61's non-dev module is different, but it's not exploitable, so we ignore it. */
+#define NETPS_BNET_MUTEX_UNLOCK_OFFSET 0x2A099 // from .text base
+#define NETPS_BNET_JUMBO_MUTEX_OFFSET  0x00850 // from .data base
+#endif
+
 // SceSysmem
-#if   FW >= 350 && FW <= 361 /* 3.50-3.52 and 3.55-3.61 are different modules, but the offsets are the same. */
+#if   FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
+// NOTE: Using __stack_chk_guard here, since AutoClockDown was added in 3.50.
+#define SYSMEM_PRINTF_OFFSET                   0x19891 // From .text base
+#define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x254F0 // From .text base
+#define SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET        0x00070 // From .data base
+#define SYSMEM_BACKTRACE_PTR_OFFSET            0x0438C // From .data base
+#elif FW >= 350 && FW <= 361 /* 3.50-3.52 and 3.55-3.61 are different modules, but the offsets are the same. */
 #define SYSMEM_PRINTF_OFFSET                   0x1A155 // From .text base
 #define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x26A68 // From .text base
 #define SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET        0x000A0 // From .data base

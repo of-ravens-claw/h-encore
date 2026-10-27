@@ -12,12 +12,37 @@
 // Or, to run the payload with hooks already in place so debugging is possible.
 // Or, to be able to run it without removing ensō first.
 // It is probably a good idea to comment this for releases.
-#define DONT_LOAD_TAIHEN_TWICE
+//#define DONT_LOAD_TAIHEN_TWICE
 
 // Comment this out for releases!
 // TODO: For some reason, this always freezes my system.
 // Is it because CatLog conflicts? Would it work better over UART?
 //#define DEBUG
+
+// Define this if you'd like to log to a file, as opposed to logging to UART.
+// NOTE: This will only work after the kernel thread has been started.
+#define FILE_LOGGING
+
+// Define this if you're using the SceNgs exploit (used by h-encore)
+#define FIX_NGS
+
+// Define this if you're using the SceNetPs use-after-free exploit (used by HENkaku)
+//#define FIX_NETPS_UAF
+
+// Define this if you're running from a syscall context (required for h-encore)
+#define RUNNING_IN_SYSCALL_CONTEXT
+
+// Define this if you'd like to modify the framebuffer address passed in r2.
+// NOTE: your kernel rop chain _must_ pass a valid framebuffer address in r2 for this to work.
+#define MODIFY_FRAMEBUFFER
+
+// For HENkaku, define:
+// - FIX_NETPS_UAF
+
+// For h-encore, define:
+// - FIX_NGS
+// - RUNNING_IN_SYSCALL_CONTEXT
+// - MODIFY_FRAMEBUFFER (optional)
 
 #ifdef DEBUG
 #define LOG(fmt, ...) sceKernelPrintf("[%s:%d] " fmt "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
@@ -299,6 +324,7 @@ static int (*ksceKernelGetMemBlockBase)(int uid, void **base) = 0;
 static int (*ksceKernelGetProcessInfo)(int pid, int *data) = 0;
 static int (*ksceKernelGetProcessLocalStorageAddrForPid)(int pid, int key, void **out_addr, int create_if_doesnt_exist) = 0;
 static int (*ksceSblACMgrIsDevelopmentMode)(void) = 0;
+static int (*sceKernelSysrootGetShellPid)(void) = NULL;
 
 // context for the hooks
 static unsigned g_homebrew_decrypt = 0;
@@ -308,7 +334,15 @@ static module_info_t* appmgr_info = 0;
 static uint32_t appmgr_code = 0;
 static uint32_t appmgr_size = 0;
 static uint32_t appmgr_data = 0;
+
+#ifdef FIX_NGS
 static uint32_t ngs_data = 0;
+#endif
+
+#ifdef FIX_NETPS_UAF
+static uint32_t netps_code = 0;
+static uint32_t netps_data = 0;
+#endif
 
 // save the block id of our own memory
 static int g_rx_block = 0;
@@ -316,15 +350,9 @@ static int* syscall_lo = 0;
 static void* syscall_stub = 0;
 static int syscall_id = 0;
 
-// shell
-static int shell_pid = 0;
-
 #ifdef DONT_LOAD_TAIHEN_TWICE
 static bool has_taihen = false;
 #endif
-
-
-#define FILE_LOGGING
 
 #ifdef FILE_LOGGING
 
@@ -438,7 +466,7 @@ unsigned hook_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(unsigned a1, unsign
 	if (res == 0x800f0624 || res == 0x800f0616 || res == 0x800f0024 || (res >= 0x800f0b30 && res <= 0x800f0b3f))
 	{
 		DACR_OFF(g_homebrew_decrypt = 1);
-		somebuf[42] = 0x40; // Known to work on 3.55-3.74, TODO!
+		somebuf[42] = 0x40; // Known to work on 3.30-3.74, TODO!
 		return 0;
 	}
 	else
@@ -626,6 +654,7 @@ void temp_sigpatches(void)
 		LOG("hooked SceProcessmgrForDriver_C715591F_SceAppMgr_imp");
 	}
 
+	// TODO: What is the purpose of this patch?
 	DACR_OFF(
 		memcpy(old_ux0_data_path, ux0_data_path_addr, sizeof(old_ux0_data_path));
 		memcpy(ux0_data_path_addr, ur0_temp_path, sizeof(ur0_temp_path));
@@ -736,17 +765,6 @@ static void find_ux0_data_path_addr(void)
 	DACR_OFF(ux0_data_path_addr = from);
 }
 
-// Maybe just call sceKernelSysrootGetShellPid instead of doing this fuckery?
-static int get_shell_pid(void)
-{
-	unsigned data[0xE8/4] = { 0 };
-	data[0]  = sizeof(data);
-	int ret  = ksceKernelGetProcessInfo(0, data);
-	int ppid = data[5];
-	LOG("ret: %x, ppid: %x", ret, ppid);
-	return ppid;
-}
-
 int load_taihen(void)
 {
 	int state;
@@ -783,6 +801,9 @@ int load_taihen(void)
 	int modid = ksceKernelLoadModule("ur0:tai/henkaku.skprx", 0, &opt);
 	LOG("LoadHENKaku kernel: 0x%08X", modid);
 	result = 0;
+	int shell_pid = sceKernelSysrootGetShellPid();
+	LOG("shell_pid: 0x%08X", shell_pid);
+	FLOG("shell_pid: 0x%08X", shell_pid);
 	ret = ksceKernelStartModule(modid, 4, &shell_pid, 0, NULL, &result);
 	LOG("StartHENkaku kernel: 0x%08X, 0x%08X", ret, result);
 
@@ -830,12 +851,23 @@ void cleanup_memory(void)
 
 int mount_savedata(int pid)
 {
-	void* (*sceAppMgrFindProcessInfoByPid)(void* data, int pid);
+	void* (*sceAppMgrFindProcessInfoByPid)(void* data, int pid) = NULL;
 	int   (*sceAppMgrMountById)(int pid, void* info, int id, const char* titleid, const char* path,
-		const char* desired_mount_point, const void* klicensee, char* mount_point);
+	                            const char* desired_mount_point, const void* klicensee, char* mount_point) = NULL;
 
 	switch (appmgr_info->module_nid)
 	{
+		case 0xF1102066: // 3.30
+			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x3E01);
+			sceAppMgrMountById = (void*)(appmgr_code + 0x1CEFD);
+			break;
+
+		case 0xA1BE0ED6: // 3.35
+		case 0x6ABD8ABA: // 3.36
+			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x3E01);
+			sceAppMgrMountById = (void*)(appmgr_code + 0x1CF29);
+			break;
+
 		case 0xE2EDFCC3: // 3.50
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x198E9);
@@ -1035,10 +1067,19 @@ void resolve_imports(uint32_t sysmem_base)
 		{
 			processmgr_info = find_modinfo((uint32_t)info.segments[0].vaddr, "SceProcessmgr");
 		}
+#ifdef FIX_NGS
 		if (strcmp(info.name, "SceNgs") == 0)
 		{
 			DACR_OFF(ngs_data = (uint32_t)info.segments[1].vaddr);
 		}
+#endif
+#ifdef FIX_NETPS_UAF
+		if (strcmp(info.name, "SceNetPs") == 0)
+		{
+			DACR_OFF(netps_code = (uint32_t)info.segments[0].vaddr);
+			DACR_OFF(netps_data = (uint32_t)info.segments[1].vaddr);
+		}
+#endif
 		if (strcmp(info.name, "SceSblACMgr") == 0)
 		{
 			sblacmgr_info = find_modinfo((uint32_t)info.segments[0].vaddr, "SceSblACMgr");
@@ -1077,6 +1118,7 @@ void resolve_imports(uint32_t sysmem_base)
 		ksceKernelGetProcessInfo = find_export(processmgr_info, 0x0AFF3EAE);
 		ksceKernelGetProcessLocalStorageAddrForPid = find_export(processmgr_info, 0xAF80F39C);
 		ksceSblACMgrIsDevelopmentMode = find_export(sblacmgr_info, 0xE87D1777);
+		sceKernelSysrootGetShellPid = find_export(sysmem_info, 0x05093E7B);
 
 #ifdef FILE_LOGGING
 		ptr_snprintf = find_export(sysmem_info, 0xAE7A8981);
@@ -1093,6 +1135,16 @@ void resolve_imports(uint32_t sysmem_base)
 	LOG("new syscall_lo: 0x%03X", *syscall_lo);
 }
 
+#ifdef FIX_NETPS_UAF
+void fix_netps(void)
+{
+	int (*sce_psnet_bnet_mutex_unlock)(void* mutex) = (void*)(netps_code + NETPS_BNET_MUTEX_UNLOCK_OFFSET);
+	void *mutex = (void*)(netps_data + NETPS_BNET_JUMBO_MUTEX_OFFSET);
+	sce_psnet_bnet_mutex_unlock(mutex);
+}
+#endif
+
+#ifdef FIX_NGS
 void fix_ngs(void)
 {	
 	// Get the process id
@@ -1120,7 +1172,9 @@ void fix_ngs(void)
 		}
 	}
 }
+#endif
 
+#ifdef MODIFY_FRAMEBUFFER
 // Color is in the following format: AABBGGRR
 void flash_screen(uint32_t framebuf, uint32_t color)
 {
@@ -1143,6 +1197,7 @@ void flash_screen(uint32_t framebuf, uint32_t color)
 
 	__asm__ volatile("mcr p15, 0, %0, c3, c0, 0" :: "r"(prev_dacr));	
 }
+#endif
 
 #define XSTRINGIFY(x) #x
 #define STRINGIFY(x) XSTRINGIFY(x)
@@ -1164,11 +1219,15 @@ void __attribute__((section(".text.start"))) payload(void* rx_block, uint32_t sy
 	DACR_OFF(sceKernelPrintf = sceKernelPrintf_local);
 #endif
 
+#ifdef RUNNING_IN_SYSCALL_CONTEXT
 	int state;
 	ENTER_SYSCALL(state);
+#endif
 
+#ifdef MODIFY_FRAMEBUFFER
 	// flash purple
 	flash_screen(framebuf, 0xFFFF00FF);
+#endif
 
 	LOG("+++ Entered kernel payload +++");
 	LOG("payload=0x%08X, sp=0x%08X", payload, &ret);
@@ -1178,14 +1237,18 @@ void __attribute__((section(".text.start"))) payload(void* rx_block, uint32_t sy
 	LOG("resolving imports");
 	resolve_imports(sysmem_addr);
 
+#ifdef FIX_NGS
 	LOG("fixing ngs");
 	fix_ngs();
+#endif
+	
+#ifdef FIX_NETPS_UAF
+	LOG("fixing netps use-after-freee");
+	fix_netps();
+#endif
 
 	LOG("set up syscalls starting at id: %x", syscall_id);
 	add_syscalls();
-
-	LOG("getting shell pid");
-	DACR_OFF(shell_pid = get_shell_pid());
 
 	LOG("adding temporary patches");
 	find_ux0_data_path_addr();
@@ -1207,7 +1270,9 @@ void __attribute__((section(".text.start"))) payload(void* rx_block, uint32_t sy
 	ret = ksceKernelStartThread(tid, 0, NULL);
 	LOG("start thread: %x", ret);
 
+#ifdef RUNNING_IN_SYSCALL_CONTEXT
 	EXIT_SYSCALL(state);
+#endif	
 
 	LOG("killing self");
 	ksceKernelExitDeleteThread(0);
