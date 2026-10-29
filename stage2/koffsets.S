@@ -33,7 +33,7 @@
 .equ SceSysmem_ldr_r2_r5_14_blx_r3,                0x1F5CF
 
 // store
-.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE5 // actually "movs r3, #0 ; str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
+.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE7 // actually "str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
 
 // move
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
@@ -49,7 +49,7 @@
 .equ SceSysmem_sceKernelRemapMemBlock,             0xA36D
 .equ SceSysmem_sceKernelFreeMemBlock,              0xA64D
 .equ SceSysmem_sceDeflateDecompress,               0x1BEA5
-.equ SceSysmem_sceKernelCopyFromUser,              0x7F2F
+.equ SceSysmem_sceKernelCopyFromUser,              0x7F2D
 .equ SceSysmem_sceKernelDcacheCleanRangeForL1WBWA, 0x22CC1
 
 // misc
@@ -76,7 +76,7 @@
 .equ SceSysmem_ldr_r2_r5_14_blx_r3,                0x1F167
 
 // store
-.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE7 // actually "movs r3, #0 ; str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
+.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE7 // actually "str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
 
 // move
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
