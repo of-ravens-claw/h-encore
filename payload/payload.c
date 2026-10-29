@@ -655,6 +655,10 @@ void temp_sigpatches(void)
 	}
 
 	// TODO: What is the purpose of this patch?
+	// Seems to be inherited from HENkaku, to allow launching the bootstrap from ur0.
+	// ...but we don't need this, since we target a save game exploit, which requires a memory card.
+	// TODO: Remove this and see if anything breaks.
+	// TODO: Also remove the path to load the bootstrap from ur0 (that code is located elsewhere.)
 	DACR_OFF(
 		memcpy(old_ux0_data_path, ux0_data_path_addr, sizeof(old_ux0_data_path));
 		memcpy(ux0_data_path_addr, ur0_temp_path, sizeof(ur0_temp_path));
@@ -855,52 +859,61 @@ int mount_savedata(int pid)
 	int   (*sceAppMgrMountById)(int pid, void* info, int id, const char* titleid, const char* path,
 	                            const char* desired_mount_point, const void* klicensee, char* mount_point) = NULL;
 
+	int info_offset = 0;	
 	switch (appmgr_info->module_nid)
 	{
 		case 0xF1102066: // 3.30
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x3E01);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x1CEFD);
+			info_offset = 0x578;
 			break;
 
 		case 0xA1BE0ED6: // 3.35
 		case 0x6ABD8ABA: // 3.36
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x3E01);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x1CF29);
+			info_offset = 0x578;
 			break;
 
 		case 0xE2EDFCC3: // 3.50
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x198E9);
+			info_offset = 0x580;
 			break;
 
 		case 0x8C76997D: // 3.51
 		case 0x1D32C3FF: // 3.52
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x19D5D);
+			info_offset = 0x580;
 			break;
 
 		case 0x94CEFE4B: // 3.55
 		case 0xDFBC288C: // 3.57
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x19E15);
+			info_offset = 0x580;
 			break;
 
 		case 0xDBB29DB7: // 3.60
 		case 0xB5F8EA7C: // 3.61
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x19B51);
+			info_offset = 0x580;
 			break;
 
 		case 0x23B967C5: // 3.63
 		case 0x1C9879D6: // 3.65
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x19E61);
+			info_offset = 0x580;
 			break;
 
 		case 0x54E2E984: // 3.67
 		case 0xC3C538DE: // 3.68
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE1);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x19E6D);
+			info_offset = 0x580;
 			break;
 
 		case 0x321E4852: // 3.69
@@ -911,6 +924,7 @@ int mount_savedata(int pid)
 		case 0x30007BD3: // 3.74
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x2DE9);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x19E95);
+			info_offset = 0x580;
 			break;
 
 		default:
@@ -925,7 +939,7 @@ int mount_savedata(int pid)
 		return -1;
 
 	char mount_point[16];
-	return sceAppMgrMountById(pid, info + 0x580, 0x3ED, "PCSG90096", "ux0:user/00/savedata/PCSG90096", "savedata0:", NULL, mount_point);
+	return sceAppMgrMountById(pid, info + info_offset, 0x3ED, "PCSG90096", "ux0:user/00/savedata/PCSG90096", "savedata0:", NULL, mount_point);
 }
 
 // Install path and arguments

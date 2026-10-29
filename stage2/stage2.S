@@ -171,7 +171,7 @@ _start:
   store_vv 2,                  voice_def_buf + 0x34
 
   // Set presets
-  set_preset 0, 0,                   -(0x148 + 2 * 0x18) + COPYOUT_PARAMS_OFFSET
+  set_preset 0, 0,                   -(0x148 + (2 * 0x18)) + COPYOUT_PARAMS_OFFSET
   set_preset 1, FAKE_COPYOUT_OFFSET, FAKE_COPYOUT_SIZE
 
   // Overwrite copyout's dst, src and len
@@ -248,7 +248,7 @@ _start:
   store_vv 4,                  voice_def_buf + 0x34
 
   // Set presets
-  set_preset 0, 0,                  -(0x148 + 4 * 0x18) - OVERWRITE_SIZE
+  set_preset 0, 0,                  -(0x148 + (4 * 0x18)) - OVERWRITE_SIZE
   set_preset 1, OVERWRITE_OFFSET,   OVERWRITE_SIZE
   set_preset 2, FAKE_HEADER_OFFSET, FAKE_HEADER_SIZE
   set_preset 3, 0,                  0x1000 // Makes the SceNgsBlock 0x2000 bytes big, but will be ignored

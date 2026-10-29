@@ -11,7 +11,13 @@
 #endif
 
 // SceLibKernel offsets
-#if FW >= 350 && FW <= 374
+#if   FW >= 310 && FW <= 336
+.equ SCE_LIB_KERNEL_OFFSET,  -0x975F
+.equ GET_MODULE_LIST_OFFSET, 0x5B3C
+.equ GET_MODULE_INFO_OFFSET, 0x5B4C
+.equ GET_THREAD_INFO_OFFSET, 0x9A39
+.equ DEVCTL_OFFSET,          0x9805
+#elif FW >= 350 && FW <= 374
 .equ SCE_LIB_KERNEL_OFFSET,  -0xA4B7
 .equ GET_MODULE_LIST_OFFSET, 0x675C
 .equ GET_MODULE_INFO_OFFSET, 0x676C
@@ -20,7 +26,13 @@
 #endif
 
 // SceNgsUser offsets
-#if   FW >= 350 && FW <= 352
+#if   FW >= 310 && FW <= 336
+.equ SYSTEM_GET_SIZE_OFFSET, 0x54D
+.equ SYSTEM_INIT_OFFSET,     0x57D
+.equ RACK_GET_SIZE_OFFSET,   0x8D1
+.equ RACK_INIT_OFFSET,       0x90D
+.equ RACK_RELEASE_OFFSET,    0xA25
+#elif FW >= 350 && FW <= 352
 .equ SYSTEM_GET_SIZE_OFFSET, 0x54D
 .equ SYSTEM_INIT_OFFSET,     0x57D
 .equ RACK_GET_SIZE_OFFSET,   0x8E5

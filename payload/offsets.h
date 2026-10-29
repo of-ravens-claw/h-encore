@@ -3,7 +3,11 @@
 #endif
 
 // SceKernelModuleMgr
-#if   FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
+#if   FW == 318
+#define MODULEMGR_BACKTRACE_OFFSET     0x00040 // From .text base
+#define MODULEMGR_SYSCALL_STUB_OFFSET  0x0850D // From .text base
+#define MODULEMGR_SYSCALL_LO_OFFSET    0x0033C // From .data base
+#elif FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
 #define MODULEMGR_BACKTRACE_OFFSET     0x00040 // From .text base
 #define MODULEMGR_SYSCALL_STUB_OFFSET  0x08579 // From .text base
 #define MODULEMGR_SYSCALL_LO_OFFSET    0x00340 // From .data base
@@ -41,7 +45,15 @@
 #endif
 
 // SceSysmem
-#if   FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
+#if   FW == 318
+#define SYSMEM_PRINTF_OFFSET                   0x19CF9 // From .text base
+// TODO: This is not AutoClockDown, that does not exist before 3.50!
+// this is instead __stack_chk_guard! which is more reliable. (above 2.00 anyway)
+// todo: update all variables & macros to match,
+#define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x25910 // From .text base
+#define SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET        0x00070 // From .data base
+#define SYSMEM_BACKTRACE_PTR_OFFSET            0x0438C // From .data base
+#elif FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
 // NOTE: Using __stack_chk_guard here, since AutoClockDown was added in 3.50.
 #define SYSMEM_PRINTF_OFFSET                   0x19891 // From .text base
 #define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x254F0 // From .text base

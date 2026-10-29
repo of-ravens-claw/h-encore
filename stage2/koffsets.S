@@ -10,7 +10,94 @@
 #error "You must define `FW` with the target firmware version!"
 #endif
 
-#if   FW >= 350 && FW <= 352
+// This may work on 3.20 as well, but I don't have a dump to make sure.
+#if   FW == 318
+// Kernel offsets
+.equ KSTACK_SIZE,                                  0x1000
+.equ KSTACK_DEVCTL_INDATA_OFFSET,                  0x700
+.equ KSTACK_SYSMEM_OFFSET,                         0x89C
+.equ SCE_SYSMEM_OFFSET,                            -0x117EB
+
+// call
+.equ SceSysmem_blx_r0,                             0x1FA8B
+.equ SceSysmem_blx_r4_pop_r4_pc,                   0x19B59
+
+// load
+.equ SceSysmem_pop_pc,                             0x3B5
+.equ SceSysmem_pop_r0_r1_pc,                       0x793
+.equ SceSysmem_pop_r0_r1_r2_r3_r4_pc,              0x25821
+.equ SceSysmem_pop_r3_pc,                          0x1515
+.equ SceSysmem_pop_r3_r4_r5_pc,                    0x135D
+.equ SceSysmem_pop_r4_r5_r6_r7_r8_pc,              0xD67
+.equ SceSysmem_ldr_r0_r0_blx_r3,                   0xCDDB
+.equ SceSysmem_ldr_r2_r5_14_blx_r3,                0x1F5CF
+
+// store
+.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE5 // actually "movs r3, #0 ; str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
+
+// move
+.equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
+
+// arithmetic
+.equ SceSysmem_adds_r0_1_bx_lr,                    0x18E7
+.equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D7A3 // closest is "add r1, sp, #0xC4 ; mov r2, r8 ; mov r0, r7 ; blx r3"
+.equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x7AD
+
+// functions
+.equ SceSysmem_sceKernelGetMemBlockBase,           0x1E05
+.equ SceSysmem_sceKernelAllocMemBlockForKernel,    0xA149
+.equ SceSysmem_sceKernelRemapMemBlock,             0xA36D
+.equ SceSysmem_sceKernelFreeMemBlock,              0xA64D
+.equ SceSysmem_sceDeflateDecompress,               0x1BEA5
+.equ SceSysmem_sceKernelCopyFromUser,              0x7F2F
+.equ SceSysmem_sceKernelDcacheCleanRangeForL1WBWA, 0x22CC1
+
+// misc
+.equ SceSysmem_empty_string,                       0x19
+#elif FW == 330
+// Kernel offsets
+.equ KSTACK_SIZE,                                  0x1000
+.equ KSTACK_DEVCTL_INDATA_OFFSET,                  0x700
+.equ KSTACK_SYSMEM_OFFSET,                         0x89C
+.equ SCE_SYSMEM_OFFSET,                            -0x11383
+
+// call
+.equ SceSysmem_blx_r0,                             0x1F623
+.equ SceSysmem_blx_r4_pop_r4_pc,                   0x196F1
+
+// load
+.equ SceSysmem_pop_pc,                             0x3B5
+.equ SceSysmem_pop_r0_r1_pc,                       0x793
+.equ SceSysmem_pop_r0_r1_r2_r3_r4_pc,              0x25401
+.equ SceSysmem_pop_r3_pc,                          0x1515
+.equ SceSysmem_pop_r3_r4_r5_pc,                    0x135D
+.equ SceSysmem_pop_r4_r5_r6_r7_r8_pc,              0xD67
+.equ SceSysmem_ldr_r0_r0_blx_r3,                   0xCDE7
+.equ SceSysmem_ldr_r2_r5_14_blx_r3,                0x1F167
+
+// store
+.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE7 // actually "movs r3, #0 ; str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
+
+// move
+.equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
+
+// arithmetic
+.equ SceSysmem_adds_r0_1_bx_lr,                    0x18E7
+.equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D33B // closest is "add r1, sp, #0xC4 ; mov r2, r8 ; mov r0, r7 ; blx r3"
+.equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x7AD
+
+// functions
+.equ SceSysmem_sceKernelGetMemBlockBase,           0x1E05
+.equ SceSysmem_sceKernelAllocMemBlockForKernel,    0xA155
+.equ SceSysmem_sceKernelRemapMemBlock,             0xA379
+.equ SceSysmem_sceKernelFreeMemBlock,              0xA659
+.equ SceSysmem_sceDeflateDecompress,               0x1BA3D
+.equ SceSysmem_sceKernelCopyFromUser,              0x7F39
+.equ SceSysmem_sceKernelDcacheCleanRangeForL1WBWA, 0x2289D
+
+// misc
+.equ SceSysmem_empty_string,                       0x19
+#elif FW >= 350 && FW <= 352
 // Kernel offsets
 .equ KSTACK_SIZE,                                  0x1000
 .equ KSTACK_DEVCTL_INDATA_OFFSET,                  0x6F8
@@ -25,7 +112,6 @@
 .equ SceSysmem_pop_pc,                             0x347
 .equ SceSysmem_pop_r0_r1_pc,                       0x853
 .equ SceSysmem_pop_r0_r1_r2_r3_r4_pc,              0x258FD
-.equ SceSysmem_pop_r1_r2_r4_r6_pc,                 0x28E0B
 .equ SceSysmem_pop_r3_pc,                          0x1605
 .equ SceSysmem_pop_r3_r4_r5_pc,                    0x144B
 .equ SceSysmem_pop_r3_r4_r5_r6_r7_pc,              0x102D
@@ -69,7 +155,6 @@
 .equ SceSysmem_pop_pc,                             0x347
 .equ SceSysmem_pop_r0_r1_pc,                       0x853
 .equ SceSysmem_pop_r0_r1_r2_r3_r4_pc,              0x258FD
-.equ SceSysmem_pop_r1_r2_r4_r6_pc,                 0x28DF3
 .equ SceSysmem_pop_r3_pc,                          0x1B4D
 .equ SceSysmem_pop_r3_r4_r5_pc,                    0x144B
 .equ SceSysmem_pop_r3_r4_r5_r6_r7_pc,              0x103F
@@ -113,7 +198,6 @@
 .equ SceSysmem_pop_pc,                             0x347
 .equ SceSysmem_pop_r0_r1_pc,                       0x853
 .equ SceSysmem_pop_r0_r1_r2_r3_r4_pc,              0x258BD
-.equ SceSysmem_pop_r1_r2_r4_r6_pc,                 0x288FF
 .equ SceSysmem_pop_r3_pc,                          0x1D8F
 .equ SceSysmem_pop_r3_r4_r5_pc,                    0x1377
 .equ SceSysmem_pop_r3_r4_r5_r6_r7_pc,              0xF59
