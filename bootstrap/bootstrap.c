@@ -646,7 +646,7 @@ int module_start(SceSize args, void* argp)
 	}
 
 	// Remove pkg patches
-	res = call_syscall(0, 0, 0, syscall_id + 1);
+	call_syscall(0, 0, 0, syscall_id + 1);
 
 	if (res >= 0)
 	{
