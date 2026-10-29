@@ -2,11 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-//#include <inttypes.h>
-
 #include "bootstrap.h"
-
-#include "offsets.h"
 
 // During development it may be useful to run the payload multiple times without rebooting.
 // Or, to run the payload with hooks already in place so debugging is possible.
@@ -43,6 +39,8 @@
 // - FIX_NGS
 // - RUNNING_IN_SYSCALL_CONTEXT
 // - MODIFY_FRAMEBUFFER (optional)
+
+#include "offsets.h"
 
 #ifdef DEBUG
 #define LOG(fmt, ...) sceKernelPrintf("[%s:%d] " fmt "\n", __FUNCTION__, __LINE__, ##__VA_ARGS__)
@@ -1024,7 +1022,7 @@ void resolve_imports(uint32_t sysmem_base)
 	
 	// Used to find SceKernelModulemgr from SceSysmem's .text address
 	LOG("sysmem base: 0x%08x", sysmem_base);
-	uint32_t sysmem_data = (uint32_t)(*(uint32_t*)(sysmem_base + SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET) - SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET);
+	uint32_t sysmem_data = (uint32_t)(*(uint32_t*)(sysmem_base + SYSMEM_TEXT2DATA_OFFSET) - SYSMEM_DATA2BASE_OFFSET);
 	LOG("sysmem data base: 0x%08x", sysmem_data);
 
 	uint32_t modulemgr_base = (*(uint32_t*)(sysmem_data + SYSMEM_BACKTRACE_PTR_OFFSET) - MODULEMGR_BACKTRACE_OFFSET);

@@ -29,6 +29,7 @@
 #define MODULEMGR_SYSCALL_LO_OFFSET    0x2038C // From .data base
 #endif
 
+#ifdef FIX_NETPS_UAF
 // SceNetPs
 #if   FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
 #define NETPS_BNET_MUTEX_UNLOCK_OFFSET 0x29641 // from .text base
@@ -43,32 +44,29 @@
 #define NETPS_BNET_MUTEX_UNLOCK_OFFSET 0x2A099 // from .text base
 #define NETPS_BNET_JUMBO_MUTEX_OFFSET  0x00850 // from .data base
 #endif
+#endif
 
 // SceSysmem
 #if   FW == 318
-#define SYSMEM_PRINTF_OFFSET                   0x19CF9 // From .text base
-// TODO: This is not AutoClockDown, that does not exist before 3.50!
-// this is instead __stack_chk_guard! which is more reliable. (above 2.00 anyway)
-// todo: update all variables & macros to match,
-#define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x25910 // From .text base
-#define SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET        0x00070 // From .data base
-#define SYSMEM_BACKTRACE_PTR_OFFSET            0x0438C // From .data base
+#define SYSMEM_PRINTF_OFFSET        0x19CF9 // From .text base
+#define SYSMEM_TEXT2DATA_OFFSET     0x25910 // From .text base
+#define SYSMEM_DATA2BASE_OFFSET     0x00070 // From .data base
+#define SYSMEM_BACKTRACE_PTR_OFFSET 0x0438C // From .data base
 #elif FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
-// NOTE: Using __stack_chk_guard here, since AutoClockDown was added in 3.50.
-#define SYSMEM_PRINTF_OFFSET                   0x19891 // From .text base
-#define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x254F0 // From .text base
-#define SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET        0x00070 // From .data base
-#define SYSMEM_BACKTRACE_PTR_OFFSET            0x0438C // From .data base
+#define SYSMEM_PRINTF_OFFSET        0x19891 // From .text base
+#define SYSMEM_TEXT2DATA_OFFSET     0x254F0 // From .text base
+#define SYSMEM_DATA2BASE_OFFSET     0x00070 // From .data base
+#define SYSMEM_BACKTRACE_PTR_OFFSET 0x0438C // From .data base
 #elif FW >= 350 && FW <= 361 /* 3.50-3.52 and 3.55-3.61 are different modules, but the offsets are the same. */
-#define SYSMEM_PRINTF_OFFSET                   0x1A155 // From .text base
-#define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x26A68 // From .text base
-#define SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET        0x000A0 // From .data base
-#define SYSMEM_BACKTRACE_PTR_OFFSET            0x0438C // From .data base
+#define SYSMEM_PRINTF_OFFSET        0x1A155 // From .text base
+#define SYSMEM_TEXT2DATA_OFFSET     0x26A68 // From .text base
+#define SYSMEM_DATA2BASE_OFFSET     0x000A0 // From .data base
+#define SYSMEM_BACKTRACE_PTR_OFFSET 0x0438C // From .data base
 #elif FW >= 363 && FW <= 374
-#define SYSMEM_PRINTF_OFFSET                   0x1A155 // From .text base
-#define SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET 0x26A28 // From .text base
-#define SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET        0x000A0 // From .data base
-#define SYSMEM_BACKTRACE_PTR_OFFSET            0x0438C // From .data base
+#define SYSMEM_PRINTF_OFFSET        0x1A155 // From .text base
+#define SYSMEM_TEXT2DATA_OFFSET     0x26A28 // From .text base
+#define SYSMEM_DATA2BASE_OFFSET     0x000A0 // From .data base
+#define SYSMEM_BACKTRACE_PTR_OFFSET 0x0438C // From .data base
 #endif
 
 // How to find each offset:
@@ -79,8 +77,8 @@
 //   To find the function that allocates system calls, find the only function that calls `SceIntrmgrForKernel_B60ACF4B / SceIntrmgrForKernel_B5A665C7`.
 //
 // - SYSMEM_PRINTF_OFFSET - location of `sceKernelPrintf`, |1 for thumb (SceDebugForDriver_391B74B7)
-// - SYSMEM_AUTOCLOCKDOWN_CTX_EXPORT_OFFSET - location of `SceSysrootForDriver_4B8C305A` in the export table.
-// - SYSMEM_AUTOCLOCKDOWN_CTX_OFFSET - location of `SceSysrootForDriver_4B8C305A`
+// - SYSMEM_TEXT2DATA_OFFSET - location of `SceSysrootForDriver_4B8C305A` in the export table.
+// - SYSMEM_DATA2BASE_OFFSET - location of `SceSysrootForDriver_4B8C305A`
 // - SYSMEM_BACKTRACE_PTR_OFFSET - variable used in `SceDebugForKernel_EFF9962B / SceDebugForKernel_91E7D24F`.
 
 // NIDs that were changed in 3.63+
