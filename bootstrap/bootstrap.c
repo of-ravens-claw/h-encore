@@ -16,7 +16,7 @@
 #define printf psvDebugScreenPrintf
 
 // GitHub enforces TLS 1.2, unfortunately.
-#define VITASHELL_BASE_ADDRESS "https://raw.githubusercontent.com/RealYoti/VitaShell/master/release"
+#define VITASHELL_BASE_ADDRESS "https://raw.githubusercontent.com/of-ravens-claw/VitaShell/custom/release"
 
 #define INCLUDE_EXTERN_RESOURCE(name) extern unsigned char _binary_res_##name##_start; extern unsigned char _binary_res_##name##_size; \
 
@@ -92,12 +92,12 @@ bool exists(const char* path)
 
 int load_sce_paf(void)
 {
-	static uint32_t argp[] = { 0x400000, 0xEA60, 0x40000, 0, 0 };
+	static uint32_t argp[] = { 0x400000, 0xEA60, 0x40000, 0, 0, 0 };
 
 	int result = -1;
 
 	SceSysmoduleOpt option;
-	option.flags     = 0x10;
+	option.flags     = 0;
 	option.result    = &result;
 	option.unused[0] = -1;
 	option.unused[1] = -1;
@@ -109,7 +109,7 @@ int unload_sce_paf(void)
 	int result = -1;
 
 	SceSysmoduleOpt option;
-	option.flags     = 0x10;
+	option.flags     = 0;
 	option.result    = &result;
 	option.unused[0] = -1;
 	option.unused[1] = -1;

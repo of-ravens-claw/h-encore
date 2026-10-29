@@ -862,6 +862,12 @@ int mount_savedata(int pid)
 	int info_offset = 0;	
 	switch (appmgr_info->module_nid)
 	{
+		case 0x97A7FDCC: // 3.18
+			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x3DC9);
+			sceAppMgrMountById = (void*)(appmgr_code + 0x1CB79);
+			info_offset = 0x578;
+			break;
+
 		case 0xF1102066: // 3.30
 			sceAppMgrFindProcessInfoByPid = (void*)(appmgr_code + 0x3E01);
 			sceAppMgrMountById = (void*)(appmgr_code + 0x1CEFD);
