@@ -70,43 +70,6 @@ do {                                          \
 	target[2] = (uint32_t)(func);         \
 } while (0)
 
-// Encodes the following instruction sequence, in Thumb mode.
-// - LDR.W IP, [PC, #4]
-// - BX    IP
-// - NOP                @ This instruction will never be executed.
-// - DCD addr           @ 32-bit address to jump to.
-// Corrupts 12 bytes.
-#define INSTALL_HOOK_THUMB(func, addr)        \
-do {                                          \
-	uint32_t* target = (uint32_t*)(addr); \
-	target[0] = 0xC004F8DF;               \
-	target[1] = 0xBF004760;               \
-	target[2] = (uint32_t)(func);         \
-} while (0)
-
-// Encodes the following instruction sequence, in ARM mode:
-// - MOV R0, #ret
-// - BX  LR
-// Corrupts 8 bytes.
-// `ret` must be encoded according to ARM's immediate encoding scheme.
-#define INSTALL_RET(addr, ret)                \
-do {                                          \
-	uint32_t* target = (uint32_t*)(addr); \
-	target[0] = 0xE3A00000 | (ret);       \
-	target[1] = 0xE12FFF1E;               \
-} while (0)
-
-// Encodes the following instruction sequence, in Thumb mode:
-// - MOVS R0, #ret
-// - BX   LR
-// Corrupts 4 bytes.
-// `ret` must be an 8-bit immediate.
-#define INSTALL_RET_THUMB(addr, ret)          \
-do {                                          \
-	uint32_t* target = (uint32_t*)(addr); \
-	target[0] = 0x47702000 | (ret);       \
-} while (0)
-
 #define ENTER_SYSCALL(state)                                                            \
 do {                                                                                    \
 	__asm__ volatile ("mrc p15, 0, %0, c13, c0, 3" : "=r"(state));                  \
@@ -277,7 +240,7 @@ void* find_import(module_info_t* mod, uint32_t lnid, uint32_t fnid)
 	for (unsigned stub = mod->stub_top; stub < mod->stub_end;)
 	{
 		// Older fw versions use a different import format
-		module_imports_2_t* imports = (module_imports_2_t *)((unsigned int)mod + 0x5C + stub - mod->stub_top);
+		module_imports_2_t* imports = (module_imports_2_t*)((unsigned int)mod + 0x5C + stub - mod->stub_top);
 
 		if (imports->size == sizeof(module_imports_2_t) && imports->lib_nid == lnid)
 		{
