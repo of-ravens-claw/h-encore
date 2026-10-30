@@ -578,6 +578,7 @@ int module_start(SceSize args, void* argp)
 			{
 				printf(" > Exiting...\n");
 				sceKernelDelayThread(500 * 1000);
+				res = 0;
 				break;
 			}
 			else if (sel == INSTALL_HENKAKU)

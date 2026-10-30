@@ -971,7 +971,9 @@ int thread_main(SceSize args, void* argp)
 		sceIoClose(fd);
 
 		SceAppMgrLaunchParam param;
+		memset(&param, 0, sizeof(param));
 		param.size = sizeof(SceAppMgrLaunchParam);
+		param.attr = 0;
 		LOG("Launching bootstrap, me @ 0x%04X...", syscall_id);
 		FLOG("Launching bootstrap, me @ 0x%04X...", syscall_id);
 		ret = sceAppMgrLaunchAppByPath(launch_path, real_args, sizeof(launch_args), 0, &param, NULL);
