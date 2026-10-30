@@ -150,20 +150,20 @@ typedef struct module_info // thanks roxfan
 	char  modname[27];   ///< Name of the module
 	uint8_t  type;          // 6 = user-mode prx?
 	void  *gp_value;     // always 0 on ARM
-	int   ent_top;       // beginning of the export list (sceModuleExports array)
-	int   ent_end;       // end of same
-	int   stub_top;      // beginning of the import list (sceModuleStubInfo array)
-	int   stub_end;      // end of same
+	uint32_t ent_top;       // beginning of the export list (sceModuleExports array)
+	uint32_t ent_end;       // end of same
+	uint32_t stub_top;      // beginning of the import list (sceModuleStubInfo array)
+	uint32_t stub_end;      // end of same
 	uint32_t module_nid;    // ID of the PRX? seems to be unused
-	int   field_38;      // unused in samples
-	int   field_3C;      // I suspect these may contain TLS info
-	int   field_40;      //
-	int   mod_start;     // 44 module start function; can be 0 or -1; also present in exports
-	int   mod_stop;      // 48 module stop function
-	int   exidx_start;   // 4c ARM EABI style exception tables
-	int   exidx_end;     // 50
-	int   extab_start;   // 54
-	int   extab_end;     // 58
+	uint32_t field_38;      // unused in samples
+	uint32_t field_3C;      // I suspect these may contain TLS info
+	uint32_t field_40;      //
+	uint32_t mod_start;     // 44 module start function; can be 0 or -1; also present in exports
+	uint32_t mod_stop;      // 48 module stop function
+	uint32_t exidx_start;   // 4c ARM EABI style exception tables
+	uint32_t exidx_end;     // 50
+	uint32_t extab_start;   // 54
+	uint32_t extab_end;     // 58
 } module_info_t; // 5c?
 
 int strcmp(const char* s1, const char* s2)
@@ -941,6 +941,8 @@ const char launch_args[] = "\0\0\0\0-nonsuspendable\0-livearea_off\0";
 
 int thread_main(SceSize args, void* argp)
 {
+	(void)args; (void)argp;
+
 	void* lr = NULL;
 	__asm__ volatile("mov %0, lr" : "=r"(lr));
 	LOG("Main kernel thread, called from %x!", lr);
@@ -1051,7 +1053,7 @@ void resolve_imports(SceUIntPtr sysmem_base)
 	LOG("modlist_records: %d", modlist_records);
 	module_info_t *threadmgr_info = NULL, *sblauthmgr_info = NULL, *processmgr_info = NULL, *iofilemgr_info = NULL, *sblacmgr_info = NULL;
 	SceUIntPtr modulemgr_data = 0;
-	for (int i = 0; i < modlist_records; i++)
+	for (SceSize i = 0; i < modlist_records; i++)
 	{
 		info.size = sizeof(info);
 		ret = sceKernelGetModuleInfo(0x10005, modlist[i], &info);

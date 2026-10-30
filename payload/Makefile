@@ -5,7 +5,7 @@ PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
 AS      = $(PREFIX)-as
 OBJCOPY = $(PREFIX)-objcopy
-CFLAGS  = -fPIE -fno-zero-initialized-in-bss -std=c99 -mcpu=cortex-a9 -Os -mthumb -DFW=$(FW)
+CFLAGS  = -fPIE -fno-zero-initialized-in-bss -std=c99 -mcpu=cortex-a9 -Os -mthumb -DFW=$(FW) -Wall -Wextra -Wno-unused-but-set-variable
 LDFLAGS = -T linker.x -nostartfiles -nostdlib -pie
 
 all: $(TARGET).bin

@@ -65,9 +65,16 @@ static const char* items[] =
 
 #define N_ITEMS (sizeof(items) / sizeof(char*))
 
-static int __attribute__((naked, noinline)) call_syscall(int a1, int a2, int a3, int num)
+static int __attribute__((naked, noinline)) call_syscall(int a1, int a2, int a3, int a4, int num)
 {
-	__asm__ volatile("mov r12, %0\nsvc 0\nbx lr\n" : : "r"(num));
+	// TODO: How do we convince GCC these are used...?
+	(void)a1; (void)a2; (void)a3; (void)a4; (void)num;
+	__asm__ volatile(
+        "ldr r12, [sp]\n\t"
+        "svc 0\n\t"
+        "bx lr\n\t"
+        : : 
+    );
 }
 
 static int write_file(const char* file, const void* buf, size_t size)
@@ -332,7 +339,7 @@ int download_vitashell(void)
 	sceIoMkdir("ux0:temp/app/sce_sys/livearea/contents", 6);
 	sceIoMkdir("ux0:temp/app/sce_sys/package", 6);
 
-	for (int i = 0; i < sizeof(vitashell_src_dst) / sizeof(DownloadSrcDst); i++)
+	for (unsigned int i = 0; i < sizeof(vitashell_src_dst) / sizeof(DownloadSrcDst); i++)
 	{
 		printf(" > Downloading %s...", vitashell_src_dst[i].src);
 		sceClibSnprintf(url, sizeof(url), "%s/%s", VITASHELL_BASE_ADDRESS, vitashell_src_dst[i].src);
@@ -355,15 +362,16 @@ int download_vitashell(void)
 int install_henkaku(void)
 {
 	int res;
-
 	sceIoMkdir("ur0:tai", 0006);
 
 	res = write_file("ur0:tai/taihen.skprx", (void*)&_binary_res_taihen_skprx_start, (size_t)&_binary_res_taihen_skprx_size);
 	if (res < 0)
 		return res;
+
 	res = write_file("ur0:tai/henkaku.skprx", (void*)&_binary_res_henkaku_skprx_start, (size_t)&_binary_res_henkaku_skprx_size);
 	if (res < 0)
 		return res;
+
 	res = write_file("ur0:tai/henkaku.suprx", (void*)&_binary_res_henkaku_suprx_start, (size_t)&_binary_res_henkaku_suprx_size);
 	if (res < 0)
 		return res;
@@ -373,11 +381,10 @@ int install_henkaku(void)
 
 int write_taihen_config(const char* path, bool recovery)
 {
-	int fd;
-
 	// write default config
 	sceIoRemove(path);
-	fd = sceIoOpen(path, SCE_O_TRUNC | SCE_O_CREAT | SCE_O_WRONLY, 6);
+
+	SceUID fd = sceIoOpen(path, SCE_O_TRUNC | SCE_O_CREAT | SCE_O_WRONLY, 6);
 	if (recovery)
 		sceIoWrite(fd, taihen_config_recovery_header, sizeof(taihen_config_recovery_header) - 1);
 	sceIoWrite(fd, taihen_config_header, sizeof(taihen_config_header) - 1);
@@ -402,8 +409,8 @@ int personalize_savedata(int syscall_id)
 	int fd;
 	uint64_t aid;
 
-	res = call_syscall(sceKernelGetProcessId(), 0, 0, syscall_id + 4);
-	if (res < 0 && res != 0x80800003)
+	res = call_syscall(sceKernelGetProcessId(), 0, 0, 0, syscall_id + 4);
+	if (res < 0 && res != (int)0x80800003)
 		return res;
 
 	res = sceRegMgrGetKeyBin("/CONFIG/NP", "account_id", &aid, sizeof(uint64_t));
@@ -421,7 +428,7 @@ int personalize_savedata(int syscall_id)
 	return 0;
 }
 
-int enter_cross = 0;
+bool enter_cross = false;
 uint32_t old_buttons = 0, current_buttons = 0, pressed_buttons = 0;
 
 void read_pad(void)
@@ -466,7 +473,7 @@ void print_result(int res)
 }
 
 uint32_t cur_fw_version = 0xFFFFFFFF;
-int print_menu(int sel)
+int print_menu(unsigned int sel)
 {
 	psvDebugScreenSetXY(0, 0);
 	psvDebugScreenSetTextColor(AZURE);
@@ -480,7 +487,7 @@ int print_menu(int sel)
 			printf(" Firmware version: %X.%02X\n\n", (cur_fw_version >> 24) & 0xFF, (cur_fw_version >> 16) & 0xFF);
 	}
 
-	for (int i = 0; i < N_ITEMS; i++)
+	for (unsigned int i = 0; i < N_ITEMS; i++)
 	{
 		psvDebugScreenSetTextColor(sel == i ? AZURE : WHITE);
 		printf(" [%c] %s\n", sel == i ? '*' : ' ', items[i]);
@@ -496,6 +503,8 @@ int print_menu(int sel)
 int _start() __attribute__ ((weak, alias ("module_start")));
 int module_start(SceSize args, void* argp)
 {
+	(void)args;
+
 	int res = -1;
 	int syscall_id = *(uint16_t*)argp;
 	sceClibPrintf("syscall_id: 0x%04X\n", syscall_id);
@@ -524,7 +533,7 @@ int module_start(SceSize args, void* argp)
 	psvDebugScreenInit();
 	psvDebugScreenClearLineDisable();
 
-	int sel = 0;
+	unsigned int sel = 0;
 	print_menu(sel);
 
 	while (true)
@@ -558,13 +567,13 @@ int module_start(SceSize args, void* argp)
 			sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);
 
 			// Remove pkg patches
-			call_syscall(0, 0, 0, syscall_id + 1);
+			call_syscall(0, 0, 0, 0, syscall_id + 1);
 
 			// Remove sig patches
-			call_syscall(0, 0, 0, syscall_id + 2);
+			call_syscall(0, 0, 0, 0, syscall_id + 2);
 
 			// Clean up
-			call_syscall(0, 0, 0, syscall_id + 3);
+			call_syscall(0, 0, 0, 0, syscall_id + 3);
 
 			sceKernelExitProcess(0);
 			return 0;
@@ -647,23 +656,23 @@ int module_start(SceSize args, void* argp)
 	}
 
 	// Remove pkg patches
-	call_syscall(0, 0, 0, syscall_id + 1);
+	call_syscall(0, 0, 0, 0, syscall_id + 1);
 
 	if (res >= 0)
 	{
 		// Start HENkaku
-		res = call_syscall(0, 0, 0, syscall_id + 0);
+		res = call_syscall(0, 0, 0, 0, syscall_id + 0);
 	}
 	else
 	{
 		// Remove sig patches
-		call_syscall(0, 0, 0, syscall_id + 2);
+		call_syscall(0, 0, 0, 0, syscall_id + 2);
 	}
 
 	// Clean up
-	call_syscall(0, 0, 0, syscall_id + 3);
+	call_syscall(0, 0, 0, 0, syscall_id + 3);
 
-	if (res < 0 && res != 0x8002D013 && res != 0x8002D017)
+	if (res < 0 && res != (int)0x8002D013 && res != (int)0x8002D017)
 	{
 		printf(" > Failed to load HENkaku! 0x%08X\n", res);
 		printf(" > Please relaunch the exploit and select 'Install HENkaku'.\n");

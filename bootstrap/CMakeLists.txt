@@ -11,7 +11,7 @@ endif()
 project(bootstrap)
 include("${VITASDK}/share/vita.cmake" REQUIRED)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=c99 -Os -Wno-unused-variable -Wno-unused-but-set-variable")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -std=c99 -Os -Wno-unused-but-set-variable")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-rtti -fno-exceptions")
 
 include_directories(
@@ -42,7 +42,8 @@ ENDFUNCTION()
 
 file(GLOB res_files RELATIVE
   ${CMAKE_SOURCE_DIR}
-  res/*
+  res/*.suprx
+  res/*.skprx
 )
 add_resources(henkaku_res ${res_files})
 
