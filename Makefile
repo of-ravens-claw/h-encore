@@ -11,7 +11,7 @@ all:
 	$(MAKE) exploit
 
 exploit:
-	cd payload; $(MAKE); rm ../stage2/payload.bin.gz; gzip -9 -n -c payload.bin > ../stage2/payload.bin.gz
+	cd payload; $(MAKE); rm ../stage2/payload.bin; cp payload.bin ../stage2/payload.bin
 	cd stage2; $(MAKE)
 	cd stage1; $(MAKE)
 #	./scripts/obfuscate.py stage1/stage1.bin 1
@@ -26,7 +26,7 @@ clean:
 	-rm system.dat
 	-rm -rf bootstrap/build
 	-rm payload/bootstrap.h
-	-rm stage2/payload.bin.gz
+	-rm stage2/payload.bin
 	cd payload; $(MAKE) clean
 	cd stage2; $(MAKE) clean
 	cd stage1; $(MAKE) clean
