@@ -36,7 +36,6 @@
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
 
 // arithmetic
-.equ SceSysmem_adds_r0_1_bx_lr,                    0x18E7
 .equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D7A3 // closest is "add r1, sp, #0xC4 ; mov r2, r8 ; mov r0, r7 ; blx r3"
 .equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x7AD
 
@@ -74,7 +73,6 @@
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
 
 // arithmetic
-.equ SceSysmem_adds_r0_1_bx_lr,                    0x18E7
 .equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D33B // closest is "add r1, sp, #0xC4 ; mov r2, r8 ; mov r0, r7 ; blx r3"
 .equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x7AD
 
@@ -112,7 +110,6 @@
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
 
 // arithmetic
-.equ SceSysmem_adds_r0_1_bx_lr,                    0x1A07
 .equ SceSysmem_add_r1_sp_bc_mov_r2_r6_blx_r3,      0x1D97D
 .equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x86D
 
@@ -150,7 +147,6 @@
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
 
 // arithmetic
-.equ SceSysmem_adds_r0_1_bx_lr,                    0x1A07
 .equ SceSysmem_add_r1_sp_bc_mov_r2_r6_blx_r3,      0x1D97D
 .equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x86D
 
@@ -188,7 +184,6 @@
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
 
 // arithmetic
-.equ SceSysmem_adds_r0_1_bx_lr,                    0x533B
 .equ SceSysmem_add_r1_sp_bc_mov_r2_r6_blx_r3,      0x1D97D
 .equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x86D
 

@@ -1233,9 +1233,7 @@ __attribute__((used)) const char s_build_str[] = "h-encore payload built on " __
 #undef XSTRINGIFY
 #undef STRINGIFY
 
-void start() __attribute__((weak, alias("payload")));
-void _start() __attribute__((weak, alias("payload")));
-void __attribute__((section(".text.start"))) payload(void* rx_block, SceUIntPtr sysmem_addr, SceUIntPtr framebuf)
+void payload(void* rx_block, SceUIntPtr sysmem_addr, SceUIntPtr framebuf)
 {
 	int ret = -1;
 
@@ -1304,4 +1302,9 @@ void __attribute__((section(".text.start"))) payload(void* rx_block, SceUIntPtr 
 
 	LOG("should not be here!");
 	while (1) { }
+}
+
+void __attribute__((section(".text.start"), target("arm"), naked)) _start(void* rx_block, SceUIntPtr sysmem_addr, SceUIntPtr framebuf)
+{
+	payload(rx_block, sysmem_addr, framebuf);
 }

