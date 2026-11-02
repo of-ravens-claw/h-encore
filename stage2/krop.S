@@ -97,7 +97,7 @@
 
 // 0x1C is how many bytes the ROP chain has used so far.
 // 0xBC comes from the instruction.
-#if (FW != 318 && FW != 330)
+#if (FW >= 350)
 .macro build_pivot_krop dst
   // Init krop chain
   init_krop \dst

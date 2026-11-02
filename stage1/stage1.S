@@ -12,19 +12,20 @@
 .include "../include/macros.S"
 
 // stage2 information
-.equ STAGE2_ADDRESS, 0x81e82000
-.equ STAGE2_SIZE,    0x30000
+// stage2 can be a maximum of 192 KB.
+.equ STAGE2_ADDRESS, 0x81E82000
+.equ STAGE2_SIZE,    0x00030000
 
 .global _start
 _start:
-  // Create a new thread whose stack base address should be at 0x81e81000
+  // Create a new thread whose stack base address should be at 0x81E81000
   call_vvvvvvv sceKernelCreateThread, empty_string, pop_pc, SCE_KERNEL_DEFAULT_PRIORITY, 0x40000, 0, 0, NULL
   store_rv     ret, thread_id
 
   // Load stage2
   call_vvv sceIoOpen,  savedata0_system_dat_path, SCE_O_RDONLY, 0
   store_rv ret,        system_dat_fd
-  call_lvv sceIoRead,  system_dat_fd, STAGE2_ADDRESS - (0x48 + 0x4 + _end - _start), STAGE2_SIZE
+  call_lvv sceIoRead,  system_dat_fd, STAGE2_ADDRESS - (0x48 + 0x04 + _end - _start), STAGE2_SIZE
   call_l   sceIoClose, system_dat_fd
 
   // Start thread and stack pivot
