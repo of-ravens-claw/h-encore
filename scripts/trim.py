@@ -15,13 +15,13 @@ def main():
     if new_len < 4:
         return -1
 
-    for i in range(new_len-4, 0, -4):
-        word, = struct.unpack("<I", data[(i):(i+4)])
+    for i in range(new_len - 4, 0, -4):
+        word, = struct.unpack("<I", data[(i) : (i + 4)])
         if word != 0:
             new_len = i
             break
 
-    open(argv[1], "wb").write(data[:new_len+4])
+    open(argv[1], "wb").write(data[:new_len + 4])
 
 
 if __name__ == "__main__":

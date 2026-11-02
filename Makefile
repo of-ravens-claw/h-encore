@@ -14,8 +14,6 @@ exploit:
 	cd payload; $(MAKE); rm ../stage2/payload.bin; cp payload.bin ../stage2/payload.bin
 	cd stage2; $(MAKE)
 	cd stage1; $(MAKE)
-#	./scripts/obfuscate.py stage1/stage1.bin 1
-#	./scripts/obfuscate.py stage2/stage2.bin 2
 	./scripts/trim.py stage2/stage2.bin
 	./scripts/generate.py stage1/stage1.bin stage2/stage2.bin system.dat
 
