@@ -30,13 +30,13 @@
 .equ SceSysmem_ldr_r0_r0_blx_r3,                   0xCDDB
 
 // store
-.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE7 // actually "str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
+.equ SceSysmem_str_r0_r4_pop_r4_pc,                0x1CE7
 
 // move
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
 
 // arithmetic
-.equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D7A3 // closest is "add r1, sp, #0xC4 ; mov r2, r8 ; mov r0, r7 ; blx r3"
+.equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D7A3
 .equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x7AD
 
 // functions
@@ -67,13 +67,13 @@
 .equ SceSysmem_ldr_r0_r0_blx_r3,                   0xCDE7
 
 // store
-.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x1CE7 // actually "str r0, [r4, #0] ; mov r0, r3 ; pop {r4, pc}", but functionally identical.
+.equ SceSysmem_str_r0_r4_pop_r4_pc,                0x1CE7
 
 // move
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
 
 // arithmetic
-.equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D33B // closest is "add r1, sp, #0xC4 ; mov r2, r8 ; mov r0, r7 ; blx r3"
+.equ SceSysmem_add_r1_sp_c4_mov_r2_r8_blx_r3,      0x1D33B
 .equ SceSysmem_sub_r1_r1_r3_bx_lr,                 0x7AD
 
 // functions
@@ -104,7 +104,7 @@
 .equ SceSysmem_ldr_r0_r0_blx_r3,                   0xD51B
 
 // store
-.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x163D
+.equ SceSysmem_str_r0_r4_pop_r4_pc,                0x163D
 
 // move
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
@@ -141,7 +141,7 @@
 .equ SceSysmem_ldr_r0_r0_blx_r3,                   0xD51B
 
 // store
-.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x163D
+.equ SceSysmem_str_r0_r4_pop_r4_pc,                0x163D
 
 // move
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67
@@ -178,7 +178,7 @@
 .equ SceSysmem_ldr_r0_r0_blx_r3,                   0x11337
 
 // store
-.equ SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc,      0x4F71
+.equ SceSysmem_str_r0_r4_pop_r4_pc,                0x4F71
 
 // move
 .equ SceSysmem_mov_sp_r1_blx_r2,                   0x67

@@ -42,7 +42,7 @@
   push 1, SceSysmem_sceKernelAllocMemBlockForKernel    // r4
   push 1, SceSysmem_blx_r4_pop_r4_pc                   // pc
   push 2, payload_code_blockid                         // r4
-  push 1, SceSysmem_str_r0_r4_movs_r0_0_pop_r4_pc      // pc
+  push 1, SceSysmem_str_r0_r4_pop_r4_pc                // pc
   push 9, 0xDEADBEEF                                   // r4
 
   // Get code block
