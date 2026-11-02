@@ -19,7 +19,7 @@
 .global _start
 _start:
   // Create a new thread whose stack base address should be at 0x81E81000
-  call_vvvvvvv sceKernelCreateThread, empty_string, pop_pc, SCE_KERNEL_DEFAULT_PRIORITY, 0x40000, 0, 0, NULL
+  call_vvvvvvv sceKernelCreateThread, empty_string, pop_pc, SCE_KERNEL_DEFAULT_PRIORITY_USER, 0x40000, 0, 0, NULL
   store_rv     ret, thread_id
 
   // Load stage2

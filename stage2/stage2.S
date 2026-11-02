@@ -80,7 +80,7 @@ _start:
   call_rv   sceKernelGetMemBlockBase, ret, framebuf + 0x04
 
   // Set framebuf
-  call_vv sceDisplaySetFrameBuf, framebuf, SCE_DISPLAY_SETBUF_NEXTFRAME
+  call_vv sceDisplaySetFrameBuf, framebuf, SCE_DISPLAY_UPDATETIMING_NEXTVSYNC
 
   // Flash white
   call_lvv memset, framebuf + 0x04, 0xFF, 960 * 544 * 4
@@ -227,7 +227,7 @@ _start:
   load_call_lv sceNgsRackRelease, rack_first, NULL
 
   // Create a new thread to allocate another kernel stack which should occupy the block of the first released rack
-  call_vvvvvvv sceKernelCreateThread, empty_string, pop_pc, SCE_KERNEL_DEFAULT_PRIORITY, 0x1000, 0, 0, NULL
+  call_vvvvvvv sceKernelCreateThread, empty_string, pop_pc, SCE_KERNEL_DEFAULT_PRIORITY_USER, 0x1000, 0, 0, NULL
   store_rv     ret, thread_id
 
   // Get thread stack base address
