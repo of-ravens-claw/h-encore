@@ -398,6 +398,7 @@ SceBool hook_sceSblAIMgrIsDEX_SceNpDrm_imp(void)
 	return SCE_TRUE;
 }
 
+// This hook is needed in order to succesfully spawn applications without the system restarting.
 int hook_SceSysrootForDriver_421EFC96_SceAppMgr_imp(void)
 {
 	return SCE_OK;
@@ -464,8 +465,6 @@ unsigned hook_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(unsigned a1, unsig
 	return orig_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(a1, a2, a3);
 }
 
-static const char ur0_temp_path[] = "ur0:temp";
-
 static SceBool has_sigpatches = SCE_FALSE;
 static char    old_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp[16] = {0};
 static char    old_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp[16] = {0};
@@ -476,8 +475,6 @@ static char    old_SceSysrootForDriver_421EFC96_SceAppMgr_imp[16] = {0};
 static char    old_sceSblAIMgrIsCEX_SceAppMgr_imp[16] = {0};
 static char    old_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp[16] = {0};
 static char    old_SceProcessmgrForDriver_C715591F_SceAppMgr_imp[16] = {0};
-static char    old_ux0_data_path[9] = {0};
-static void*   ux0_data_path_addr = NULL;
 
 void temp_pkgpatches(void)
 {
@@ -622,17 +619,6 @@ void temp_sigpatches(void)
 		LOG("hooked SceProcessmgrForDriver_C715591F_SceAppMgr_imp");
 	}
 
-	// TODO: What is the purpose of this patch?
-	// Seems to be inherited from HENkaku, to allow launching the bootstrap from ur0.
-	// ...but we don't need this, since we target a save game exploit, which requires a memory card.
-	// TODO: Remove this and see if anything breaks.
-	// TODO: Also remove the path to load the bootstrap from ur0 (that code is located elsewhere.)
-	DACR_OFF(
-		memcpy(old_ux0_data_path, ux0_data_path_addr, sizeof(old_ux0_data_path));
-		memcpy(ux0_data_path_addr, ur0_temp_path, sizeof(ur0_temp_path));
-	);
-	LOG("hooked ux0:data path");
-
 	DACR_OFF(has_sigpatches = SCE_TRUE);
 
 	__asm__ volatile("isb" : : : "memory");
@@ -718,23 +704,9 @@ void remove_sigpatches(void)
 		LOG("unhooked SceProcessmgrForDriver_C715591F_SceAppMgr_imp");
 	}
 
-	DACR_OFF(memcpy(ux0_data_path_addr, old_ux0_data_path, sizeof(old_ux0_data_path)));
-	LOG("unhooked ux0:data path");
-
 	DACR_OFF(has_sigpatches = SCE_FALSE);
 
 	__asm__ volatile("isb" : : : "memory");
-}
-
-static void find_ux0_data_path_addr(void)
-{
-	char* from = (char*)(appmgr_code + appmgr_info->stub_top);
-	char* to   = (char*)(appmgr_code + appmgr_size);
-
-	while (strcmp(from, "ux0:data") != 0 && from < (to - 8))
-		from += 4;
-
-	DACR_OFF(ux0_data_path_addr = from);
 }
 
 int load_taihen(void)
@@ -928,8 +900,7 @@ int mount_savedata(SceUID pid)
 }
 
 // Install path and arguments
-const char launch_path_ur[] = "ur0:/temp/bootstrap.self";
-const char launch_path_ux[] = "ux0:/data/bootstrap.self";
+const char launch_path_ux[] = "ux0:data/bootstrap.self";
 const char launch_args[] = "\0\0\0\0-nonsuspendable\0-livearea_off\0";
 
 int thread_main(SceSize args, void* argp)
@@ -950,14 +921,6 @@ int thread_main(SceSize args, void* argp)
 	int ret = fd;
 	LOG("ux sceIoOpen: %x", fd);
 	FLOG("ux sceIoOpen: 0x%08X", fd);
-	if (fd < 0)
-	{
-		launch_path = launch_path_ur;
-		fd  = sceIoOpen(launch_path, 0x603, 0006);
-		ret = fd;
-		LOG("ur sceIoOpen: %x", fd);
-		FLOG("ur sceIoOpen: 0x%08X", fd);
-	}
 
 	if (fd >= 0)
 	{
@@ -1267,7 +1230,6 @@ void payload(void* rx_block, SceUIntPtr sysmem_addr, SceUIntPtr framebuf)
 	add_syscalls();
 
 	LOG("adding temporary patches");
-	find_ux0_data_path_addr();
 	temp_pkgpatches();
 	temp_sigpatches();
 
