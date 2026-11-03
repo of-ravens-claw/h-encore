@@ -1,3 +1,5 @@
+#define SCE_OK 0
+
 typedef int SceUID;
 
 typedef int SceBool;
@@ -27,7 +29,7 @@ typedef struct SceKernelStartModuleOpt
 } SceKernelStartModuleOpt;
 
 // SceAppMgr
-typedef struct SceAppMgrLaunchParam // size is 0x34
+typedef struct SceAppMgrLaunchParam // size is 0x34 on FW 3.18-3.74
 {
 	SceSize   size;         // Size of this structure
 	SceUInt32 attr;         // set to 0x80000000 to break on launch
@@ -58,7 +60,7 @@ typedef struct SceKernelThreadOptParam // Min size is 4 bytes. Max size is 0x14 
 } SceKernelThreadOptParam;
 
 // SceProcessmgr
-typedef struct SceKernelProcessInfo // size is 0x24 or 0x4C on FW 0.931, 0xE8 on FW 3.60
+typedef struct SceKernelProcessInfo // size is 0x24 or 0x4C on FW 0.931, 0xE8 on FW 3.18-3.74
 {
 	SceSize   size;           // Size of this structure
 	SceUID    pid;            // Process ID

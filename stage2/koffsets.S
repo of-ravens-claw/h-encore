@@ -48,7 +48,7 @@
 
 // misc
 .equ SceSysmem_empty_string,                       0x19
-#elif FW == 330
+#elif FW >= 330 && FW <= 336 /* 3.30 and 3.35-3.36 are different modules, but the offsets are the same. */
 // Kernel offsets
 .equ KSTACK_SIZE,                                  0x1000
 .equ KSTACK_DEVCTL_INDATA_OFFSET,                  0x700

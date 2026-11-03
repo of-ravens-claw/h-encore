@@ -268,10 +268,10 @@ static unsigned (*orig_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp)(uns
 static unsigned (*orig_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp)(unsigned a1, unsigned a2, unsigned a3) = NULL;
 
 // SceKernelModulemgr
-static int (*sceKernelGetModuleList)(SceUID pid, int flags1, int flags2, SceUID* modids, SceSize* num) = NULL; // guessed name.
-static int (*sceKernelGetModuleInfo)(SceUID pid, SceUID modid, SceKernelModuleInfo* info) = NULL; // guessed name.
+static int (*sceKernelGetModuleList)(SceUID pid, int flags1, int flags2, SceUID* pModuleIds, SceSize* pNumModules) = NULL; // guessed name.
+static int (*sceKernelGetModuleInfo)(SceUID pid, SceUID moduleId, SceKernelModuleInfo* pInfo) = NULL; // guessed name.
 static SceUID (*sceKernelLoadModule)(const char* moduleFileName, SceUInt32 flags, const SceKernelLoadModuleOpt* pOpt) = NULL;
-static int (*sceKernelStartModule)(SceUID uid, SceSize args, const void* argp, SceUInt32 flags, const SceKernelStartModuleOpt* pOpt, int *pRes) = NULL;
+static int (*sceKernelStartModule)(SceUID uid, SceSize args, const void* argp, SceUInt32 flags, const SceKernelStartModuleOpt* pOpt, int* pRes) = NULL;
 static void (*sceKernelRegisterSyscall)(SceUInt32 index, void* function) = NULL; // guessed name.
 
 // SceSysmem
@@ -321,7 +321,7 @@ static SceUIntPtr netps_data = 0;
 #endif
 
 // save the block id of our own memory
-static int g_rx_block = 0;
+static SceUID g_rx_block = 0;
 static int* syscall_lo = NULL;
 static void* syscall_stub = NULL;
 static int syscall_id = 0;
@@ -351,14 +351,6 @@ do { \
 	buffer[0] = '\0'; \
 	ptr_snprintf(buffer, sizeof(buffer), "[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
 	logg(buffer, my_strlen(buffer), LOG_LOC, 2); \
-} while (0)
-
-#define FLOG_START(fmt, ...) \
-do { \
-	char buffer[256]; \
-	buffer[0] = '\0'; \
-	ptr_snprintf(buffer, sizeof(buffer), "[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
-	logg(buffer, my_strlen(buffer), LOG_LOC, 1); \
 } while (0)
 
 typedef enum bare_SceIoMode
@@ -394,37 +386,36 @@ static int logg(const void* buffer, int length, const char* logloc, int create)
 }
 #else
 #define FLOG(...)
-#define FLOG_START(...)
 #endif
 
-int hook_sceSblAIMgrIsCEX_SceNpDrm_imp(void)
+SceBool hook_sceSblAIMgrIsCEX_SceNpDrm_imp(void)
 {
-	return 1;
+	return SCE_TRUE;
 }
 
-int hook_sceSblAIMgrIsDEX_SceNpDrm_imp(void)
+SceBool hook_sceSblAIMgrIsDEX_SceNpDrm_imp(void)
 {
-	return 1;
+	return SCE_TRUE;
 }
 
 int hook_SceSysrootForDriver_421EFC96_SceAppMgr_imp(void)
 {
-	return 0;
+	return SCE_OK;
 }
 
-int hook_sceSblAIMgrIsCEX_SceAppMgr_imp(void)
+SceBool hook_sceSblAIMgrIsCEX_SceAppMgr_imp(void)
 {
-	return 0;
+	return SCE_FALSE;
 }
 
-int hook_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp(void)
+SceBool hook_sceSblACMgrIsDevelopmentMode_SceAppMgr_imp(void)
 {
-	return 1;
+	return SCE_TRUE;
 }
 
-int hook_SceProcessmgrForDriver_C715591F_SceAppMgr_imp(void)
+SceBool hook_SceProcessmgrForDriver_C715591F_SceAppMgr_imp(void)
 {
-	return 0;
+	return SCE_FALSE;
 }
 
 // setup file decryption
@@ -442,12 +433,10 @@ unsigned hook_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(unsigned a1, unsign
 	{
 		DACR_OFF(g_homebrew_decrypt = SCE_TRUE);
 		somebuf[42] = 0x40; // Known to work on 1.60-3.74, probably never changed...?
-		return 0;
+		return SCE_OK;
 	}
-	else
-	{
-		DACR_OFF(g_homebrew_decrypt = SCE_FALSE);
-	}
+
+	DACR_OFF(g_homebrew_decrypt = SCE_FALSE);
 	return res;
 }
 
@@ -456,8 +445,10 @@ unsigned hook_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(unsigned a1, 
 {
 	LOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(0x%x, 0x%x) hb=0x%x", a1, a2, g_homebrew_decrypt);
 	FLOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(0x%08X, 0x%08X) 0x%08X", a1, a2, g_homebrew_decrypt);
+
 	if (g_homebrew_decrypt == SCE_TRUE)
 		return 2; // always compressed!
+
 	return orig_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(a1, a2);
 }
 
@@ -466,8 +457,10 @@ unsigned hook_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(unsigned a1, unsig
 {
 	LOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(0x%x, 0x%x, 0x%x) hb=0x%x", a1, a2, a3, g_homebrew_decrypt);
 	FLOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(0x%08X, 0x%08X, 0x%08X) hb=0x%08X", a1, a2, a3, g_homebrew_decrypt);
+
 	if (g_homebrew_decrypt == SCE_TRUE)
-		return 0;
+		return SCE_OK;
+
 	return orig_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(a1, a2, a3);
 }
 
@@ -772,7 +765,7 @@ int load_taihen(void)
 	int ret = sceKernelStartModule(taiid, 0, NULL, 0, NULL, &result);
 	LOG("start taiHEN: 0x%08X, 0x%08X", ret, result);
 	
-	if (ret == 0)
+	if (ret == SCE_OK)
 		ret = result;
 	if (ret < 0)
 		goto end;
@@ -789,7 +782,7 @@ int load_taihen(void)
 	ret = sceKernelStartModule(modid, sizeof(SceUID), &shell_pid, 0, NULL, &result);
 	LOG("start HENkaku kernel: 0x%08X, 0x%08X", ret, result);
 
-	if (ret == 0)
+	if (ret == SCE_OK)
 		ret = result;
 	if (ret < 0)
 		goto end;
@@ -1164,7 +1157,7 @@ void resolve_imports(SceUIntPtr sysmem_base)
 void fix_netps(void)
 {
 	int (*sce_psnet_bnet_mutex_unlock)(void* mutex) = (void*)(netps_code + NETPS_BNET_MUTEX_UNLOCK_OFFSET);
-	void *mutex = (void*)(netps_data + NETPS_BNET_JUMBO_MUTEX_OFFSET);
+	void* mutex = (void*)(netps_data + NETPS_BNET_JUMBO_MUTEX_OFFSET);
 	sce_psnet_bnet_mutex_unlock(mutex);
 }
 #endif
