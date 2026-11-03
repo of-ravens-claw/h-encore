@@ -18,7 +18,7 @@
 
 // Define this if you'd like to log to a file, as opposed to logging to UART.
 // NOTE: This will only work after the kernel thread has been started.
-#define FILE_LOGGING
+//#define FILE_LOGGING
 
 // Define this if you're using the SceNgs exploit (used by h-encore)
 #define FIX_NGS
@@ -332,8 +332,6 @@ static SceBool has_taihen = SCE_FALSE;
 
 #ifdef FILE_LOGGING
 
-#define LOG_LOC "ux0:payload.log"
-
 size_t my_strlen(const char* str)
 {
 	const char* s = str;
@@ -350,39 +348,21 @@ do { \
 	char buffer[256]; \
 	buffer[0] = '\0'; \
 	ptr_snprintf(buffer, sizeof(buffer), "[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
-	logg(buffer, my_strlen(buffer), LOG_LOC, 2); \
+	logg(buffer, my_strlen(buffer)); \
 } while (0)
 
-typedef enum bare_SceIoMode
-{
-	SCE_O_WRONLY = 0x0002, //!< Write-only
-	SCE_O_APPEND = 0x0100, //!< Append
-	SCE_O_CREAT  = 0x0200, //!< Create
-	SCE_O_TRUNC  = 0x0400, //!< Truncate
-} bare_SceIoMode;
-
-static int logg(const void* buffer, int length, const char* logloc, int create)
+static int logg(const void* buffer, int length)
 {
 	if (!sceIoOpen || !sceIoWrite || !sceIoClose)
-		return 0;
+		return (int)0x80010016; // SCE_ERROR_ERRNO_EINVAL
 
-	int fd;
-
-	if (create == 0)
-		fd = sceIoOpen(logloc, SCE_O_WRONLY | SCE_O_APPEND, 6);
-	else if (create == 1)
-		fd = sceIoOpen(logloc, SCE_O_WRONLY | SCE_O_TRUNC | SCE_O_CREAT, 6);
-	else if (create == 2)
-		fd = sceIoOpen(logloc, SCE_O_WRONLY | SCE_O_APPEND | SCE_O_CREAT, 6);
-	else
-		fd = -1;
-	
+	SceUID fd = sceIoOpen("ux0:payload.log", SCE_O_WRONLY | SCE_O_APPEND | SCE_O_CREAT, 6);
 	if (fd < 0)
-		return 0;
+		return fd;
 
 	sceIoWrite(fd, buffer, length);
 	sceIoClose(fd);
-	return 1;
+	return SCE_OK;
 }
 #else
 #define FLOG(...)
@@ -422,12 +402,12 @@ SceBool hook_SceProcessmgrForDriver_C715591F_SceAppMgr_imp(void)
 // setup file decryption
 unsigned hook_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(unsigned a1, unsigned a2, unsigned a3, unsigned a4)
 {
-	LOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(0x%x, 0x%x, 0x%x, 0x%x)", a1, a2, a3, a4);
-	FLOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(0x%08X, 0x%08X, 0x%08X, 0x%08X)", a1, a2, a3, a4);
+	LOG("sceSblAuthMgrAuthHeader_hook(0x%08X, 0x%08X, 0x%08X, 0x%08X)", a1, a2, a3, a4);
+	FLOG("sceSblAuthMgrAuthHeader_hook(0x%08X, 0x%08X, 0x%08X, 0x%08X)", a1, a2, a3, a4);
 
 	unsigned res = orig_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(a1, a2, a3, a4);
-	LOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp: %x", res);
-	FLOG("sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp: 0x%08X", res);
+	LOG("sceSblAuthMgrAuthHeader_orig returned: 0x%08X", res);
+	FLOG("sceSblAuthMgrAuthHeader_orig returned: 0x%08X", res);
 	unsigned* somebuf = (unsigned*)a4;
 
 	if (res == 0x800F0624 || res == 0x800F0616 || res == 0x800F0024 || (res >= 0x800F0B30 && res <= 0x800F0B3F))
@@ -444,8 +424,8 @@ unsigned hook_sceSblAuthMgrAuthHeader_SceKernelModulemgr_imp(unsigned a1, unsign
 // setup output buffer
 unsigned hook_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(unsigned a1, unsigned a2)
 {
-	LOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(0x%x, 0x%x) hb=0x%x", a1, a2, g_homebrew_decrypt);
-	FLOG("sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(0x%08X, 0x%08X) 0x%08X", a1, a2, g_homebrew_decrypt);
+	LOG("sceSblAuthMgrSetupAuthSegment_hook(0x%08X, 0x%08X) hb=%d", a1, a2, g_homebrew_decrypt);
+	FLOG("sceSblAuthMgrSetupAuthSegment_hook(0x%08X, 0x%08X) hb=%d", a1, a2, g_homebrew_decrypt);
 
 	if (g_homebrew_decrypt == SCE_TRUE)
 		return 2; // always compressed!
@@ -456,8 +436,8 @@ unsigned hook_sceSblAuthMgrSetupAuthSegment_SceKernelModulemgr_imp(unsigned a1, 
 // decrypt
 unsigned hook_sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(unsigned a1, unsigned a2, unsigned a3)
 {
-	LOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(0x%x, 0x%x, 0x%x) hb=0x%x", a1, a2, a3, g_homebrew_decrypt);
-	FLOG("sceSblAuthMgrAuthSegment_SceKernelModulemgr_imp(0x%08X, 0x%08X, 0x%08X) hb=0x%08X", a1, a2, a3, g_homebrew_decrypt);
+	LOG("sceSblAuthMgrAuthSegment_hook(0x%08X, 0x%08X, 0x%08X) hb=%d", a1, a2, a3, g_homebrew_decrypt);
+	FLOG("sceSblAuthMgrAuthSegment_hook(0x%08X, 0x%08X, 0x%08X) hb=%d", a1, a2, a3, g_homebrew_decrypt);
 
 	if (g_homebrew_decrypt == SCE_TRUE)
 		return SCE_OK;
@@ -784,7 +764,7 @@ void cleanup_memory(void)
 	void* lr = NULL;
 	__asm__ volatile("mov %0, lr" : "=r"(lr));
 
-	LOG("calling cleanup from %x", lr);
+	LOG("calling cleanup from 0x%08X", lr);
 	FLOG("calling cleanup from 0x%08X", lr);
 	// TODO: Delete bootstrap.self (#37)
 
@@ -810,7 +790,7 @@ int mount_savedata(SceUID pid)
 	int   (*sceAppMgrMountById)(SceUID pid, void* info, int id, const char* titleid, const char* path,
 	                            const char* desired_mount_point, const void* klicensee, char* mount_point) = NULL;
 
-	int info_offset = 0;	
+	int info_offset = 0;
 	switch (appmgr_info->module_nid)
 	{
 		case 0x97A7FDCC: // 3.18
@@ -900,7 +880,7 @@ int mount_savedata(SceUID pid)
 }
 
 // Install path and arguments
-const char launch_path_ux[] = "ux0:data/bootstrap.self";
+const char launch_path[] = "ux0:data/bootstrap.self";
 const char launch_args[] = "\0\0\0\0-nonsuspendable\0-livearea_off\0";
 
 int thread_main(SceSize args, void* argp)
@@ -909,23 +889,23 @@ int thread_main(SceSize args, void* argp)
 
 	void* lr = NULL;
 	__asm__ volatile("mov %0, lr" : "=r"(lr));
-	LOG("Main kernel thread, called from %x!", lr);
+	LOG("Main kernel thread, called from 0x%08X!", lr);
 	FLOG("Main kernel thread, called from 0x%08X!", lr);
 
 	char real_args[sizeof(launch_args)];
 	memcpy(real_args, launch_args, sizeof(launch_args));
 	*(uint16_t*)&real_args[0] = syscall_id;
 
-	const char* launch_path = launch_path_ux;
-	int fd  = sceIoOpen(launch_path, 0x603, 0006);
+	SceUID fd = sceIoOpen(launch_path, SCE_O_TRUNC | SCE_O_CREAT | SCE_O_RDWR, 6);
 	int ret = fd;
-	LOG("ux sceIoOpen: %x", fd);
-	FLOG("ux sceIoOpen: 0x%08X", fd);
+	LOG("sceIoOpen returned: 0x%08X", ret);
+	FLOG("sceIoOpen returned: 0x%08X", ret);
 
 	if (fd >= 0)
 	{
 		ret = sceIoWrite(fd, bootstrap_self, bootstrap_self_len);
-		LOG("sceIoWrite: %x", ret);
+		LOG("sceIoWrite returned: 0x%08X", ret);
+		FLOG("sceIoWrite returned: 0x%08X", ret);
 		sceIoClose(fd);
 
 		SceAppMgrLaunchParam param;
@@ -935,7 +915,7 @@ int thread_main(SceSize args, void* argp)
 		LOG("Launching bootstrap, me @ 0x%04X...", syscall_id);
 		FLOG("Launching bootstrap, me @ 0x%04X...", syscall_id);
 		ret = sceAppMgrLaunchAppByPath(launch_path, real_args, sizeof(launch_args), 0, &param, NULL);
-		LOG("sceAppMgrLaunchAppByPath: %x", ret);
+		LOG("sceAppMgrLaunchAppByPath: 0x%08X", ret);
 		FLOG("sceAppMgrLaunchAppByPath: 0x%08X", ret);
 	}
 
@@ -1004,15 +984,15 @@ void resolve_imports(SceUIntPtr sysmem_base)
 	SceKernelModuleInfo info;
 	memset(&info, 0, sizeof(info));
 
-	int ret = sceKernelGetModuleList(0x10005, 0x7FFFFFFF, 1, modlist, &modlist_records);
-	LOG("sceKernelGetModuleList() returned 0x%x", ret);
+	int ret = sceKernelGetModuleList(SCE_KERNEL_PROCESS_ID, 0x7FFFFFFF, 1, modlist, &modlist_records);
+	LOG("sceKernelGetModuleList() returned 0x%08X", ret);
 	LOG("modlist_records: %d", modlist_records);
 	module_info_t *threadmgr_info = NULL, *sblauthmgr_info = NULL, *processmgr_info = NULL, *iofilemgr_info = NULL, *sblacmgr_info = NULL;
 	SceUIntPtr modulemgr_data = 0;
 	for (SceSize i = 0; i < modlist_records; i++)
 	{
 		info.size = sizeof(info);
-		ret = sceKernelGetModuleInfo(0x10005, modlist[i], &info);
+		ret = sceKernelGetModuleInfo(SCE_KERNEL_PROCESS_ID, modlist[i], &info);
 		if (strcmp(info.name, "SceKernelThreadMgr") == 0)
 		{
 			threadmgr_info = find_modinfo((SceUIntPtr)info.segments[0].vaddr, "SceKernelThreadMgr");
@@ -1176,7 +1156,7 @@ void flash_screen(SceUIntPtr framebuf, SceUInt32 color)
 		}
 	}
 
-	__asm__ volatile("mcr p15, 0, %0, c3, c0, 0" : : "r"(prev_dacr));	
+	__asm__ volatile("mcr p15, 0, %0, c3, c0, 0" : : "r"(prev_dacr));
 }
 #endif
 
@@ -1226,7 +1206,7 @@ void payload(void* rx_block, SceUIntPtr sysmem_addr, SceUIntPtr framebuf)
 	fix_netps();
 #endif
 
-	LOG("set up syscalls starting at id: %x", syscall_id);
+	LOG("set up syscalls starting at id: 0x%03X", syscall_id);
 	add_syscalls();
 
 	LOG("adding temporary patches");
@@ -1239,18 +1219,18 @@ void payload(void* rx_block, SceUIntPtr sysmem_addr, SceUIntPtr framebuf)
 	LOG("flush changes");
 	void* base = NULL;
 	ret = sceKernelGetMemBlockBase(g_rx_block, &base);
-	LOG("sceKernelGetMemBlockBase: %x, %x", ret, base);
+	LOG("sceKernelGetMemBlockBase returned: 0x%08X, pBase: 0x%08X", ret, base);
 	sceKernelDcacheCleanRangeForL1WBWA(base, 0x4000);
 
 	LOG("starting kernel thread");
 	SceUID tid = sceKernelCreateThread("stage2", thread_main, 64, 0x4000, 0, 0, NULL);
-	LOG("create tid: %x", tid);
+	LOG("create tid: 0x%08X", tid);
 	ret = sceKernelStartThread(tid, 0, NULL);
-	LOG("start thread: %x", ret);
+	LOG("start thread: 0x%08X", ret);
 
 #ifdef RUNNING_IN_SYSCALL_CONTEXT
 	EXIT_SYSCALL(state);
-#endif	
+#endif
 
 	LOG("killing self");
 	sceKernelExitDeleteThread(0);
